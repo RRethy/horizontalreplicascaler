@@ -2,6 +2,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -15,6 +17,11 @@ import (
 
 	rrethyv1 "github.com/RRethy/horizontalrpelicascaler/api/v1"
 )
+
+type MetricResult struct {
+	Type  string
+	Value float64
+}
 
 // HorizontalReplicaScalerReconciler reconciles a HorizontalReplicaScaler object
 type HorizontalReplicaScalerReconciler struct {
@@ -59,7 +66,18 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, req c
 	}
 
 	// TODO: go through each metric and calculate the desired number of replicas
+	metricResults, err := r.getMetricResults(horizontalReplicaScaler)
+	log.Info("getMetricResults", "metricResults", metricResults, "err", err)
+
 	// TODO: calculate the max(metric_desired_replicas[])
+	var desiredReplicas int32
+	for _, metricResult := range metricResults {
+		if int32(metricResult.Value) > desiredReplicas {
+			desiredReplicas = int32(metricResult.Value)
+		}
+	}
+	log.Info("calculated max of metrics", "desiredReplicas", desiredReplicas)
+
 	// TODO: apply min_replicas and max_replicas constraints
 	// TODO: update the scale subresource with the desired number of replicas
 
@@ -78,4 +96,35 @@ func (r *HorizontalReplicaScalerReconciler) getScaleSubresource(horizontalReplic
 	gr := schema.GroupResource{Group: horizontalReplicaScaler.Spec.ScaleTargetRef.Group, Resource: horizontalReplicaScaler.Spec.ScaleTargetRef.Kind}
 	return r.ScaleClient.Scales(horizontalReplicaScaler.Namespace).
 		Get(context.TODO(), gr, horizontalReplicaScaler.Spec.ScaleTargetRef.Name, metav1.GetOptions{})
+}
+
+// getMetricResults returns the result of calculating each metric.
+func (r *HorizontalReplicaScalerReconciler) getMetricResults(horizontalReplicaScaler rrethyv1.HorizontalReplicaScaler) ([]MetricResult, error) {
+	var metricResults []MetricResult
+	for _, metric := range horizontalReplicaScaler.Spec.Metrics {
+		metricResult, err := r.getMetricResult(metric)
+		if err != nil {
+			return nil, err
+		}
+		metricResults = append(metricResults, metricResult)
+	}
+	return metricResults, nil
+}
+
+// getMetricResult returns the result of calculating a metric.
+func (r *HorizontalReplicaScalerReconciler) getMetricResult(metric rrethyv1.MetricSpec) (MetricResult, error) {
+	switch metric.Type {
+	case "Static":
+		if targetStr, ok := metric.Config["target"]; ok {
+			// Parse the target value as a float64
+			target, err := strconv.ParseFloat(targetStr, 64)
+			if err != nil {
+				return MetricResult{}, fmt.Errorf("parsing target value %s: %w", targetStr, err)
+			}
+			return MetricResult{Type: metric.Type, Value: target}, nil
+		}
+		return MetricResult{}, fmt.Errorf("missing target value in Static metric spec")
+	default:
+		return MetricResult{}, fmt.Errorf("unknown metric type %s", metric.Type)
+	}
 }
