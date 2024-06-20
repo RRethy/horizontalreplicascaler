@@ -41,14 +41,80 @@ spec:
             description: HorizontalReplicaScalerSpec defines the desired state of
               HorizontalReplicaScaler
             properties:
-              foo:
-                description: Foo is an example field of HorizontalReplicaScaler. Edit
-                  horizontalreplicascaler_types.go to remove/update
-                type: string
+              maxReplicas:
+                description: MaxReplicas is the upper limit for the number of replicas
+                  to which the target can be scaled
+                format: int32
+                minimum: 1
+                type: integer
+              metrics:
+                description: Metrics is a list of metrics the autoscaler should use
+                  to scale the target
+                items:
+                  properties:
+                    config:
+                      additionalProperties:
+                        type: string
+                      description: Config is a map of configuration values for the
+                        metric
+                      type: object
+                    target:
+                      description: Target is the target value for the metric
+                      type: string
+                    type:
+                      description: Type is the type of metric to use
+                      enum:
+                      - Static
+                      type: string
+                  required:
+                  - config
+                  - target
+                  - type
+                  type: object
+                minItems: 1
+                type: array
+              minReplicas:
+                description: MinReplicas is the lower limit for the number of replicas
+                  to which the target can be scaled
+                format: int32
+                minimum: 1
+                type: integer
+              scaleTargetRef:
+                description: ScaleTargetRef points to the target resource to scale
+                properties:
+                  group:
+                    description: Group is the group of the target resource
+                    type: string
+                  kind:
+                    description: |-
+                      Kind is a string value representing the REST resource this object represents.
+                      Servers may infer this from the endpoint the client submits requests to.
+                    type: string
+                  name:
+                    description: Name is the name of the resource being referred to
+                      by the scale target.
+                    type: string
+                required:
+                - group
+                - kind
+                - name
+                type: object
+            required:
+            - maxReplicas
+            - metrics
+            - minReplicas
+            - scaleTargetRef
             type: object
           status:
             description: HorizontalReplicaScalerStatus defines the observed state
               of HorizontalReplicaScaler
+            properties:
+              info:
+                description: Info is a human-readable message about the status of
+                  the autoscaler
+                type: string
+            required:
+            - info
             type: object
         type: object
     served: true
