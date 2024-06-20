@@ -58,6 +58,11 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{}, err
 	}
 
+	// TODO: go through each metric and calculate the desired number of replicas
+	// TODO: calculate the max(metric_desired_replicas[])
+	// TODO: apply min_replicas and max_replicas constraints
+	// TODO: update the scale subresource with the desired number of replicas
+
 	return ctrl.Result{}, nil
 }
 
