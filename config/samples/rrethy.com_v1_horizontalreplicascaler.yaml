@@ -1,0 +1,9 @@
+apiVersion: rrethy.com.rrethy.com/v1
+kind: HorizontalReplicaScaler
+metadata:
+  labels:
+    app.kubernetes.io/name: horizonalreplicascaler
+    app.kubernetes.io/managed-by: kustomize
+  name: horizontalreplicascaler-sample
+spec:
+  # TODO(user): Add fields here

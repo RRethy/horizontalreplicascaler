@@ -7,4 +7,14 @@ layout:
 - go.kubebuilder.io/v4
 projectName: horizonalreplicascaler
 repo: github.com/RRethy/horizontalrpelicascaler
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: rrethy.com
+  group: rrethy.com
+  kind: HorizontalReplicaScaler
+  path: github.com/RRethy/horizontalrpelicascaler/api/v1
+  version: v1
 version: "3"

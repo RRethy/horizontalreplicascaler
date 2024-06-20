@@ -23,16 +23,22 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	"k8s.io/client-go/dynamic"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/scale"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	rrethycomv1 "github.com/RRethy/horizontalrpelicascaler/api/v1"
+	"github.com/RRethy/horizontalrpelicascaler/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -44,6 +50,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
+	utilruntime.Must(rrethycomv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -119,6 +126,27 @@ func main() {
 		os.Exit(1)
 	}
 
+	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create Kubernetes client set")
+		os.Exit(1)
+	}
+
+	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(clientset.Discovery())
+	scaleClient, err := scale.NewForConfig(mgr.GetConfig(), mgr.GetRESTMapper(), dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	if err != nil {
+		setupLog.Error(err, "unable to create scale client")
+		os.Exit(1)
+	}
+
+	if err = (&controller.HorizontalReplicaScalerReconciler{
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ScaleClient: scaleClient,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "HorizontalReplicaScaler")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

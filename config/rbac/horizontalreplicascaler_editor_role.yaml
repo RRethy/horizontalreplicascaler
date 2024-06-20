@@ -1,8 +1,11 @@
----
+# permissions for end users to edit horizontalreplicascalers.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: manager-role
+  labels:
+    app.kubernetes.io/name: horizonalreplicascaler
+    app.kubernetes.io/managed-by: kustomize
+  name: horizontalreplicascaler-editor-role
 rules:
 - apiGroups:
   - rrethy.com.rrethy.com
@@ -19,14 +22,6 @@ rules:
 - apiGroups:
   - rrethy.com.rrethy.com
   resources:
-  - horizontalreplicascalers/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - rrethy.com.rrethy.com
-  resources:
   - horizontalreplicascalers/status
   verbs:
   - get
-  - patch
-  - update
