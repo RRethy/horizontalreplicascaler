@@ -5,6 +5,14 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - '*'
+  resources:
+  - '*/scale'
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - rrethy.com.rrethy.com
   resources:
   - horizontalreplicascalers
