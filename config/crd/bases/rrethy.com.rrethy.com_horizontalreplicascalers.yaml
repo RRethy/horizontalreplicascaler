@@ -64,7 +64,8 @@ spec:
                     type:
                       description: Type is the type of metric to use
                       enum:
-                      - Static
+                      - static
+                      - prometheus
                       type: string
                   required:
                   - config

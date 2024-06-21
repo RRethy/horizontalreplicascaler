@@ -24,7 +24,7 @@ type ScaleTargetRef struct {
 type MetricSpec struct {
 	// Type is the type of metric to use
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum=Static
+	// +kubebuilder:validation:Enum=static;prometheus
 	Type string `json:"type"`
 
 	// Config is a map of configuration values for the metric
