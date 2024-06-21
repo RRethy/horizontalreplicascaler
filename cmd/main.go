@@ -10,6 +10,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	promapi "github.com/prometheus/client_golang/api"
+	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -123,10 +125,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	promClient, err := promapi.NewClient(promapi.Config{
+		Address: "http://demo.robustperception.io:9090",
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to create prometheus client")
+		os.Exit(1)
+	}
+	promv1api := promv1.NewAPI(promClient)
+
 	if err = (&controller.HorizontalReplicaScalerReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
 		ScaleClient: scaleClient,
+		PromAPI:     promv1api,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HorizontalReplicaScaler")
 		os.Exit(1)

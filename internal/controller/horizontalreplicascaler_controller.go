@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +29,7 @@ type HorizontalReplicaScalerReconciler struct {
 	client.Client
 	Scheme      *runtime.Scheme
 	ScaleClient scale.ScalesGetter
+	PromAPI     promv1.API
 }
 
 // +kubebuilder:rbac:groups=rrethy.com.rrethy.com,resources=horizontalreplicascalers,verbs=get;list;watch;create;update;patch;delete
