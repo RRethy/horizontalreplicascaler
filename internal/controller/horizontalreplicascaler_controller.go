@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	prommodel "github.com/prometheus/common/model"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,11 +69,11 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{}, err
 	}
 
-	// TODO: go through each metric and calculate the desired number of replicas
-	metricResults, err := r.getMetricResults(horizontalReplicaScaler)
+	// TODO: go through each metric and calculate the desired number of replicas.
+	metricResults, err := r.getMetricResults(ctx, horizontalReplicaScaler)
 	log.Info("getMetricResults", "metricResults", metricResults, "err", err)
 
-	// TODO: calculate the max(metric_desired_replicas[])
+	// TODO: calculate the max(metric_desired_replicas[]).
 	var desiredReplicas int32
 	for _, metricResult := range metricResults {
 		if int32(metricResult.Value) > desiredReplicas {
@@ -80,8 +82,8 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, req c
 	}
 	log.Info("calculated max of metrics", "desiredReplicas", desiredReplicas)
 
-	// TODO: apply min_replicas and max_replicas constraints
-	// TODO: update the scale subresource with the desired number of replicas
+	// TODO: apply min_replicas and max_replicas constraints.
+	// TODO: update the scale subresource with the desired number of replicas.
 
 	return ctrl.Result{}, nil
 }
@@ -101,10 +103,10 @@ func (r *HorizontalReplicaScalerReconciler) getScaleSubresource(horizontalReplic
 }
 
 // getMetricResults returns the result of calculating each metric.
-func (r *HorizontalReplicaScalerReconciler) getMetricResults(horizontalReplicaScaler rrethyv1.HorizontalReplicaScaler) ([]MetricResult, error) {
+func (r *HorizontalReplicaScalerReconciler) getMetricResults(ctx context.Context, horizontalReplicaScaler rrethyv1.HorizontalReplicaScaler) ([]MetricResult, error) {
 	var metricResults []MetricResult
 	for _, metric := range horizontalReplicaScaler.Spec.Metrics {
-		metricResult, err := r.getMetricResult(metric)
+		metricResult, err := r.getMetricResult(ctx, metric)
 		if err != nil {
 			return nil, err
 		}
@@ -114,9 +116,9 @@ func (r *HorizontalReplicaScalerReconciler) getMetricResults(horizontalReplicaSc
 }
 
 // getMetricResult returns the result of calculating a metric.
-func (r *HorizontalReplicaScalerReconciler) getMetricResult(metric rrethyv1.MetricSpec) (MetricResult, error) {
+func (r *HorizontalReplicaScalerReconciler) getMetricResult(ctx context.Context, metric rrethyv1.MetricSpec) (MetricResult, error) {
 	switch metric.Type {
-	case "Static":
+	case "static":
 		if targetStr, ok := metric.Config["target"]; ok {
 			// Parse the target value as a float64
 			target, err := strconv.ParseFloat(targetStr, 64)
@@ -125,7 +127,22 @@ func (r *HorizontalReplicaScalerReconciler) getMetricResult(metric rrethyv1.Metr
 			}
 			return MetricResult{Type: metric.Type, Value: target}, nil
 		}
-		return MetricResult{}, fmt.Errorf("missing target value in Static metric spec")
+		return MetricResult{}, fmt.Errorf("missing target value in static metric spec")
+	case "prometheus":
+		// TODO: don't ignore warnings.
+		// TODO: we shouldn't be blocking on this query.
+		result, _, err := r.PromAPI.Query(ctx, "up", time.Now(), promv1.WithTimeout(5*time.Second))
+		if err != nil {
+			return MetricResult{}, fmt.Errorf("querying prometheus: %w", err)
+		}
+		if result.Type() != prommodel.ValScalar {
+			return MetricResult{}, fmt.Errorf("expected scalar value, got %s", result.Type())
+		}
+		target, err := strconv.ParseFloat(result.String(), 64)
+		if err != nil {
+			return MetricResult{}, fmt.Errorf("parsing target value %s: %w", result.String(), err)
+		}
+		return MetricResult{Type: metric.Type, Value: target}, nil
 	default:
 		return MetricResult{}, fmt.Errorf("unknown metric type %s", metric.Type)
 	}
