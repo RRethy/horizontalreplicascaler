@@ -116,7 +116,7 @@ func main() {
 	}
 
 	promClient, err := promapi.NewClient(promapi.Config{
-		Address: "http://demo.robustperception.io:9090",
+		Address: "http://observe-prometheus-proxy.autoscaler-operator.svc.cluster.local:9090",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to create prometheus client")
