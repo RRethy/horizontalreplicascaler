@@ -8,7 +8,6 @@ import (
 
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	prommodel "github.com/prometheus/common/model"
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,7 +58,9 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, req c
 
 	log.Info("reconciling horizontalreplicascaler", "name", horizontalReplicaScaler.Name)
 
-	scaleSubresource, err := r.getScaleSubresource(&horizontalReplicaScaler)
+	gr := schema.GroupResource{Group: horizontalReplicaScaler.Spec.ScaleTargetRef.Group, Resource: horizontalReplicaScaler.Spec.ScaleTargetRef.Kind}
+	scaleSubresource, err := r.ScaleClient.Scales(horizontalReplicaScaler.Namespace).
+		Get(ctx, gr, horizontalReplicaScaler.Spec.ScaleTargetRef.Name, metav1.GetOptions{})
 	log.Info("getTargetScale", "targetScale", scaleSubresource, "err", err)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -83,7 +84,19 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, req c
 	log.Info("calculated max of metrics", "desiredReplicas", desiredReplicas)
 
 	// TODO: apply min_replicas and max_replicas constraints.
+	if desiredReplicas < horizontalReplicaScaler.Spec.MinReplicas {
+		desiredReplicas = horizontalReplicaScaler.Spec.MinReplicas
+	} else if desiredReplicas > horizontalReplicaScaler.Spec.MaxReplicas {
+		desiredReplicas = horizontalReplicaScaler.Spec.MaxReplicas
+	}
+
 	// TODO: update the scale subresource with the desired number of replicas.
+	scaleSubresource.Spec.Replicas = desiredReplicas
+	scaleSubresource, err = r.ScaleClient.Scales(horizontalReplicaScaler.Namespace).Update(ctx, gr, scaleSubresource, metav1.UpdateOptions{})
+	log.Info("updateScale", "scale", scaleSubresource, "err", err)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -93,13 +106,6 @@ func (r *HorizontalReplicaScalerReconciler) SetupWithManager(mgr ctrl.Manager) e
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&rrethyv1.HorizontalReplicaScaler{}).
 		Complete(r)
-}
-
-// getScaleSubresource returns the Scale subresource for the HorizontalReplicaScaler's target.
-func (r *HorizontalReplicaScalerReconciler) getScaleSubresource(horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) (*autoscalingv1.Scale, error) {
-	gr := schema.GroupResource{Group: horizontalReplicaScaler.Spec.ScaleTargetRef.Group, Resource: horizontalReplicaScaler.Spec.ScaleTargetRef.Kind}
-	return r.ScaleClient.Scales(horizontalReplicaScaler.Namespace).
-		Get(context.TODO(), gr, horizontalReplicaScaler.Spec.ScaleTargetRef.Name, metav1.GetOptions{})
 }
 
 // getMetricResults returns the result of calculating each metric.
