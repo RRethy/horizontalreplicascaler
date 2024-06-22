@@ -13,7 +13,7 @@ resources:
     namespaced: true
   controller: true
   domain: rrethy.com
-  group: rrethy.com
+  group: scaling
   kind: HorizontalReplicaScaler
   path: github.com/RRethy/horizontalrpelicascaler/api/v1
   version: v1

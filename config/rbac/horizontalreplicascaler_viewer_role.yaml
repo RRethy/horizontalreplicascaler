@@ -8,7 +8,7 @@ metadata:
   name: horizontalreplicascaler-viewer-role
 rules:
 - apiGroups:
-  - rrethy.com.rrethy.com
+  - scaling.rrethy.com
   resources:
   - horizontalreplicascalers
   verbs:
@@ -16,7 +16,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - rrethy.com.rrethy.com
+  - scaling.rrethy.com
   resources:
   - horizontalreplicascalers/status
   verbs:

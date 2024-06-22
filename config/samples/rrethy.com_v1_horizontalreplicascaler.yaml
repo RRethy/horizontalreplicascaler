@@ -1,4 +1,4 @@
-apiVersion: rrethy.com.rrethy.com/v1
+apiVersion: scaling.rrethy.com/v1
 kind: HorizontalReplicaScaler
 metadata:
   labels:

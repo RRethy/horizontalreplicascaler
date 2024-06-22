@@ -13,7 +13,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - rrethy.com.rrethy.com
+  - scaling.rrethy.com
   resources:
   - horizontalreplicascalers
   verbs:
@@ -25,13 +25,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - rrethy.com.rrethy.com
+  - scaling.rrethy.com
   resources:
   - horizontalreplicascalers/finalizers
   verbs:
   - update
 - apiGroups:
-  - rrethy.com.rrethy.com
+  - scaling.rrethy.com
   resources:
   - horizontalreplicascalers/status
   verbs:
