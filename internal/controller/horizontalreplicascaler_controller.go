@@ -70,23 +70,24 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{}, err
 	}
 
-	// TODO: go through each metric and calculate the desired number of replicas.
-	metricResults, err := r.getMetricResults(ctx, horizontalReplicaScaler)
-	if err != nil {
-		log.Error(err, "unable to get metric results")
-		return ctrl.Result{}, err
-	}
-	log.Info("getMetricResults", "metricResults", metricResults, "err", err)
-
-	// TODO: calculate the max(metric_desired_replicas[]).
-	desiredReplicas := r.getMaxMetricResults(metricResults)
-	log.Info("calculated max of metrics", "desiredReplicas", desiredReplicas)
-
-	// TODO: apply min_replicas and max_replicas constraints.
-	desiredReplicas = r.applyMinMaxReplicas(horizontalReplicaScaler, desiredReplicas)
+	// // TODO: go through each metric and calculate the desired number of replicas.
+	// metricResults, err := r.getMetricResults(ctx, horizontalReplicaScaler)
+	// if err != nil {
+	// 	log.Error(err, "unable to get metric results")
+	// 	return ctrl.Result{}, err
+	// }
+	// log.Info("getMetricResults", "metricResults", metricResults, "err", err)
+	//
+	// // TODO: calculate the max(metric_desired_replicas[]).
+	// desiredReplicas := r.getMaxMetricResults(metricResults)
+	// log.Info("calculated max of metrics", "desiredReplicas", desiredReplicas)
+	//
+	// // TODO: apply min_replicas and max_replicas constraints.
+	// desiredReplicas = r.applyMinMaxReplicas(horizontalReplicaScaler, desiredReplicas)
 
 	// TODO: update the scale subresource with the desired number of replicas.
-	err = r.updateScaleSubresource(ctx, horizontalReplicaScaler, scaleSubresource, desiredReplicas)
+	err = r.updateScaleSubresource(ctx, horizontalReplicaScaler, scaleSubresource, 15)
+	// err = r.updateScaleSubresource(ctx, horizontalReplicaScaler, scaleSubresource, desiredReplicas)
 	if err != nil {
 		log.Error(err, "unable to update scale subresource")
 		return ctrl.Result{}, err
