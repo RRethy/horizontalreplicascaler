@@ -127,6 +127,7 @@ func main() {
 	if err = (&controller.HorizontalReplicaScalerReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
+		Recorder:    mgr.GetEventRecorderFor("horizontalreplicascaler-controller"),
 		ScaleClient: scaleClient,
 		PromAPI:     promv1api,
 	}).SetupWithManager(mgr); err != nil {
