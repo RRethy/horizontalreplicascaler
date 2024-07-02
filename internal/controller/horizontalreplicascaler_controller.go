@@ -4,7 +4,11 @@ import (
 	"context"
 
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/record"
@@ -14,6 +18,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	rrethyv1 "github.com/RRethy/horizontalrpelicascaler/api/v1"
+)
+
+const (
+	EventReasonFailedGetScaleSubresource = "FailedGetScaleSubresource"
 )
 
 type MetricResult struct {
@@ -58,6 +66,14 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 		}
 	}()
 
+	scaleSubresource, err := r.getScaleSubresource(ctx, horizontalReplicaScaler)
+	if err != nil {
+		log.Error(err, "failed to get scale subresource")
+		r.Recorder.Event(horizontalReplicaScaler, corev1.EventTypeWarning, EventReasonFailedGetScaleSubresource, err.Error())
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	log.Info("scale subresource", ".spec.replicas", scaleSubresource.Spec.Replicas)
+
 	log.Info("reconciling HorizontalReplicaScaler")
 	return ctrl.Result{}, nil
 }
@@ -67,4 +83,10 @@ func (r *HorizontalReplicaScalerReconciler) SetupWithManager(mgr ctrl.Manager) e
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&rrethyv1.HorizontalReplicaScaler{}).
 		Complete(reconcile.AsReconciler(mgr.GetClient(), r))
+}
+
+// getScaleSubresource returns the scale subresource for the target resource.
+func (r *HorizontalReplicaScalerReconciler) getScaleSubresource(ctx context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) (*autoscalingv1.Scale, error) {
+	gr := schema.GroupResource{Group: horizontalReplicaScaler.Spec.ScaleTargetRef.Group, Resource: horizontalReplicaScaler.Spec.ScaleTargetRef.Kind}
+	return r.ScaleClient.Scales(horizontalReplicaScaler.Namespace).Get(ctx, gr, horizontalReplicaScaler.Spec.ScaleTargetRef.Name, metav1.GetOptions{})
 }
