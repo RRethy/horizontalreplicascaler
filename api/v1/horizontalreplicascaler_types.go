@@ -103,8 +103,41 @@ type HorizontalReplicaScalerSpec struct {
 	Metrics []MetricSpec `json:"metrics"`
 }
 
+// ScaleEvent defines an event in the stabilization window for the scaling rule.
+type ScaleEvent struct {
+	// Value is the replica value for the scale event.
+	// +kubebuilder:validation:Required
+	Value int32 `json:"value"`
+
+	// Timestamp is the timestamp of the scale event.
+	// +kubebuilder:validation:Required
+	Timestamp metav1.Time `json:"timestamp"`
+}
+
+// ScaleRulesStatus defines the observed state of ScaleRules.
+type ScaleRulesStatus struct {
+	// StabilizationWindow is the observed events in the stabilization window for the scaling rule.
+	// +kubebuilder:validation:Optional
+	StabilizationWindow []ScaleEvent `json:"stabilizationWindow"`
+}
+
+// ScalingBehaviorStatus defines the observed state of ScalingBehavior.
+type ScalingBehaviorStatus struct {
+	// ScaleUp is the scaling behavior status for scaling up.
+	// +kubebuilder:validation:Optional
+	ScaleUp ScaleRulesStatus `json:"scaleUp"`
+
+	// ScaleDown is the scaling behavior status for scaling down.
+	// +kubebuilder:validation:Optional
+	ScaleDown ScaleRulesStatus `json:"scaleDown"`
+}
+
 // HorizontalReplicaScalerStatus defines the observed state of HorizontalReplicaScaler.
-type HorizontalReplicaScalerStatus struct{}
+type HorizontalReplicaScalerStatus struct {
+	// ScalingBehaviourStatus is the observed state of the scaling behaviors.
+	// +kubebuilder:validation:Optional
+	ScalingBehaviourStatus ScalingBehaviorStatus `json:"scalingBehaviourStatus"`
+}
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status

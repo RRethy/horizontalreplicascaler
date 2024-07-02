@@ -172,8 +172,16 @@ func (r *HorizontalReplicaScalerReconciler) applyScalingBehavior(horizontalRepli
 		horizontalReplicaScaler.Spec.ScaleTargetRef.Group,
 	)
 
-	stabilizedDownScale := r.ScaleDownStabilizationWindow.Stabilize(stabilizationWindowKey, desiredReplicas, horizontalReplicaScaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow.Duration)
-	stabilizedUpScale := r.ScaleUpStabilizationWindow.Stabilize(stabilizationWindowKey, desiredReplicas, horizontalReplicaScaler.Spec.ScalingBehavior.ScaleUp.StabilizationWindow.Duration)
+	stabilizedDownScale := r.ScaleDownStabilizationWindow.Stabilize(
+		stabilizationWindowKey,
+		desiredReplicas,
+		horizontalReplicaScaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow.Duration,
+	)
+	stabilizedUpScale := r.ScaleUpStabilizationWindow.Stabilize(
+		stabilizationWindowKey,
+		desiredReplicas,
+		horizontalReplicaScaler.Spec.ScalingBehavior.ScaleUp.StabilizationWindow.Duration,
+	)
 
 	if desiredReplicas < currentReplicas {
 		return stabilizedDownScale
