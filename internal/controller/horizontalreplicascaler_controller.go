@@ -18,6 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
@@ -104,6 +105,7 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 func (r *HorizontalReplicaScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&rrethyv1.HorizontalReplicaScaler{}).
+		WithEventFilter(predicate.Or(predicate.GenerationChangedPredicate{}, predicate.AnnotationChangedPredicate{})).
 		Complete(reconcile.AsReconciler(mgr.GetClient(), r))
 }
 
