@@ -160,6 +160,14 @@ func (r *HorizontalReplicaScalerReconciler) applyMinMaxReplicas(horizontalReplic
 }
 
 func (r *HorizontalReplicaScalerReconciler) applyScalingBehaviour(horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler, desiredReplicas int32) int32 {
+	// stabilizationWindowKey := stabilization.KeyFor(
+	// 	horizontalReplicaScaler.Namespace,
+	// 	horizontalReplicaScaler.Name,
+	// 	horizontalReplicaScaler.Spec.ScaleTargetRef.Name,
+	// 	horizontalReplicaScaler.Spec.ScaleTargetRef.Kind,
+	// 	horizontalReplicaScaler.Spec.ScaleTargetRef.Group,
+	// )
+
 	return desiredReplicas
 }
 

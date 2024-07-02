@@ -37,11 +37,11 @@ type ScalingRules struct {
 type ScalingBehavior struct {
 	// ScaleUp is the scaling behavior for scaling up.
 	// +kubebuilder:validation:Optional
-	ScaleUp *ScalingRules `json:"scaleUp,omitempty"`
+	ScaleUp ScalingRules `json:"scaleUp,omitempty"`
 
 	// ScaleDown is the scaling behavior for scaling down.
 	// +kubebuilder:validation:Optional
-	ScaleDown *ScalingRules `json:"scaleDown,omitempty"`
+	ScaleDown ScalingRules `json:"scaleDown,omitempty"`
 }
 
 // TargetSec defines the target that should be scaled towards.
@@ -90,7 +90,7 @@ type HorizontalReplicaScalerSpec struct {
 
 	// ScalingBehavior is the way in which we scale the target to the desired replicas.
 	// +kubebuilder:validation:Optional
-	ScalingBehavior *ScalingBehavior `json:"scalingBehavior,omitempty"`
+	ScalingBehavior ScalingBehavior `json:"scalingBehavior,omitempty"`
 
 	// PollingInterval is a best-effort target for how often the autoscaler should poll the metrics.
 	// +kubebuilder:validation:Optional
