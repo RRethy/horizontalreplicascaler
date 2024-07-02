@@ -23,7 +23,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	rrethycomv1 "github.com/RRethy/horizontalrpelicascaler/api/v1"
+	rrethyv1 "github.com/RRethy/horizontalrpelicascaler/api/v1"
 	"github.com/RRethy/horizontalrpelicascaler/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
@@ -36,7 +36,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(rrethycomv1.AddToScheme(scheme))
+	utilruntime.Must(rrethyv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

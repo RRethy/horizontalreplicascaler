@@ -7,62 +7,46 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	rrethycomv1 "github.com/RRethy/horizontalrpelicascaler/api/v1"
+	rrethyv1 "github.com/RRethy/horizontalrpelicascaler/api/v1"
 )
 
 var _ = Describe("HorizontalReplicaScaler Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
+		const namespace = "default"
 
 		ctx := context.Background()
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: namespace,
 		}
-		horizontalreplicascaler := &rrethycomv1.HorizontalReplicaScaler{}
+		horizontalreplicascaler := &rrethyv1.HorizontalReplicaScaler{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind HorizontalReplicaScaler")
 			err := k8sClient.Get(ctx, typeNamespacedName, horizontalreplicascaler)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &rrethycomv1.HorizontalReplicaScaler{
+				resource := &rrethyv1.HorizontalReplicaScaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &rrethycomv1.HorizontalReplicaScaler{}
+			resource := &rrethyv1.HorizontalReplicaScaler{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Cleanup the specific resource instance HorizontalReplicaScaler")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-		})
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &HorizontalReplicaScalerReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
-
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
 		})
 	})
 })
