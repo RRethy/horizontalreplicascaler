@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"time"
 
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -61,6 +60,8 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 	nsName := types.NamespacedName{Namespace: horizontalReplicaScaler.Namespace, Name: horizontalReplicaScaler.Name}
 	log := log.FromContext(ctx).WithValues("horizontalreplicascaler", nsName)
 
+	pollingInterval := horizontalReplicaScaler.Spec.PollingInterval.Duration
+
 	if !horizontalReplicaScaler.DeletionTimestamp.IsZero() {
 		// The object is being deleted, don't do anything.
 		return ctrl.Result{}, nil
@@ -77,13 +78,13 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 	if err != nil {
 		log.Error(err, "getting scale subresource")
 		r.Recorder.Event(horizontalReplicaScaler, corev1.EventTypeWarning, EventReasonFailedGetScaleSubresource, err.Error())
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{RequeueAfter: pollingInterval}, client.IgnoreNotFound(err)
 	}
 
 	metricResults, err := r.getMetricValues(ctx, horizontalReplicaScaler)
 	if err != nil {
 		log.Error(err, "getting metric results")
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: pollingInterval}, err
 	}
 
 	desiredReplicas := r.getMaxMetricValues(metricResults)
@@ -95,10 +96,10 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 	err = r.updateScaleSubresource(ctx, horizontalReplicaScaler, scaleSubresource, desiredReplicas)
 	if err != nil {
 		log.Error(err, "updating scale subresource")
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: pollingInterval}, nil
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: pollingInterval}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
