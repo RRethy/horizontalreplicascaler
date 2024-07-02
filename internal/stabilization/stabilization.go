@@ -1,9 +1,11 @@
 package stabilization
 
 import (
-	"fmt"
+	"strings"
 	"sync"
 	"time"
+
+	"k8s.io/utils/clock"
 )
 
 type RollingWindowType byte
@@ -13,34 +15,53 @@ const (
 	MinRollingWindow
 )
 
+func KeyFor(s ...string) string {
+	return strings.Join(s, "/")
+}
+
+type Option func(*Window)
+
+func WithClock(clock clock.Clock) Option {
+	return func(w *Window) {
+		w.Clock = clock
+	}
+}
+
 type Event struct {
 	Value     int32
 	Timestamp time.Time
 }
 
 type Window struct {
+	Clock         clock.Clock
 	Mutex         sync.RWMutex
 	Type          RollingWindowType
 	RollingEvents map[string][]Event
 }
 
-func NewWindow(rollingWindowType RollingWindowType) *Window {
-	return &Window{
+func NewWindow(rollingWindowType RollingWindowType, options ...Option) *Window {
+	w := &Window{
+		Clock:         clock.RealClock{},
 		Mutex:         sync.RWMutex{},
 		Type:          rollingWindowType,
 		RollingEvents: make(map[string][]Event),
 	}
+
+	for _, option := range options {
+		option(w)
+	}
+
+	return w
 }
 
 // TODO: pass in status
-func (w *Window) AddEvent(name, namespace string, value, windowSeconds int32) {
-	key := w.keyFor(name, namespace)
-
+// TODO: don't use seconds
+func (w *Window) AddEvent(key string, value, windowSeconds int32) {
 	w.Mutex.Lock()
 	defer w.Mutex.Unlock()
 
 	window := w.RollingEvents[key]
-	t := time.Now()
+	t := w.Clock.Now()
 
 	for len(window) > 0 && window[0].Timestamp.Add(time.Duration(windowSeconds)*time.Second).Before(t) {
 		window = window[1:]
@@ -63,9 +84,7 @@ func (w *Window) AddEvent(name, namespace string, value, windowSeconds int32) {
 	w.RollingEvents[key] = window
 }
 
-func (w *Window) GetStabilizedValue(name, namespace string) (value int32, ok bool) {
-	key := w.keyFor(name, namespace)
-
+func (w *Window) GetStabilizedValue(key string) (value int32, ok bool) {
 	w.Mutex.RLock()
 	defer w.Mutex.RUnlock()
 
@@ -79,8 +98,4 @@ func (w *Window) GetStabilizedValue(name, namespace string) (value int32, ok boo
 	}
 
 	return window[len(window)-1].Value, true
-}
-
-func (w *Window) keyFor(name, namespace string) string {
-	return fmt.Sprintf("%s/%s", namespace, name)
 }

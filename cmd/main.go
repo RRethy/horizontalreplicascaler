@@ -25,6 +25,7 @@ import (
 
 	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
 	"github.com/RRethy/horizontalreplicascaler/internal/controller"
+	"github.com/RRethy/horizontalreplicascaler/internal/stabilization"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -125,11 +126,12 @@ func main() {
 	promv1api := promv1.NewAPI(promClient)
 
 	if err = (&controller.HorizontalReplicaScalerReconciler{
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		Recorder:    mgr.GetEventRecorderFor("horizontalreplicascaler-controller"),
-		ScaleClient: scaleClient,
-		PromAPI:     promv1api,
+		Client:                       mgr.GetClient(),
+		Scheme:                       mgr.GetScheme(),
+		Recorder:                     mgr.GetEventRecorderFor("horizontalreplicascaler-controller"),
+		ScaleClient:                  scaleClient,
+		PromAPI:                      promv1api,
+		ScaleDownStabilizationWindow: stabilization.NewWindow(stabilization.MaxRollingWindow),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HorizontalReplicaScaler")
 		os.Exit(1)

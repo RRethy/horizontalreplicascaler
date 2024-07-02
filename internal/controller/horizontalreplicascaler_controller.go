@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
+	"github.com/RRethy/horizontalreplicascaler/internal/stabilization"
 )
 
 const (
@@ -35,10 +36,11 @@ type metricValue struct {
 // HorizontalReplicaScalerReconciler reconciles a HorizontalReplicaScaler object
 type HorizontalReplicaScalerReconciler struct {
 	client.Client
-	Scheme      *runtime.Scheme
-	Recorder    record.EventRecorder
-	ScaleClient scale.ScalesGetter
-	PromAPI     promv1.API
+	Scheme                       *runtime.Scheme
+	Recorder                     record.EventRecorder
+	ScaleClient                  scale.ScalesGetter
+	PromAPI                      promv1.API
+	ScaleDownStabilizationWindow *stabilization.Window
 }
 
 // +kubebuilder:rbac:groups=scaling.rrethy.com,resources=horizontalreplicascalers,verbs=get;list;watch;create;update;patch;delete
