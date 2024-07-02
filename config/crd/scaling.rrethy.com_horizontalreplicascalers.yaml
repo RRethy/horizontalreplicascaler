@@ -8,9 +8,13 @@ metadata:
 spec:
   group: scaling.rrethy.com
   names:
+    categories:
+    - all
     kind: HorizontalReplicaScaler
     listKind: HorizontalReplicaScalerList
     plural: horizontalreplicascalers
+    shortNames:
+    - hrs
     singular: horizontalreplicascaler
   scope: Namespaced
   versions:
@@ -18,7 +22,7 @@ spec:
     schema:
       openAPIV3Schema:
         description: HorizontalReplicaScaler is the Schema for the horizontalreplicascalers
-          API
+          API.
         properties:
           apiVersion:
             description: |-
@@ -39,36 +43,49 @@ spec:
             type: object
           spec:
             description: HorizontalReplicaScalerSpec defines the desired state of
-              HorizontalReplicaScaler
+              HorizontalReplicaScaler.
             properties:
               maxReplicas:
                 description: MaxReplicas is the upper limit for the number of replicas
-                  to which the target can be scaled
+                  to which the target can be scaled.
                 format: int32
                 minimum: 1
                 type: integer
               metrics:
                 description: Metrics is a list of metrics the autoscaler should use
-                  to scale the target
+                  to scale the target.
                 items:
+                  description: MetricSpec defines a metric to consider for scaling.
                   properties:
                     config:
                       additionalProperties:
                         type: string
                       description: Config is a map of configuration values for the
-                        metric
+                        metric.
                       type: object
                     target:
-                      description: Target is the target value for the metric
-                      type: string
+                      description: Target is the target specification for the metric.
+                      properties:
+                        type:
+                          description: Type is the type of the target.
+                          enum:
+                          - pod-average
+                          - value
+                          type: string
+                        value:
+                          description: Value is the value of the target.
+                          type: string
+                      required:
+                      - type
+                      - value
+                      type: object
                     type:
-                      description: Type is the type of metric to use
+                      description: Type is the type of metric to use.
                       enum:
                       - static
                       - prometheus
                       type: string
                   required:
-                  - config
                   - target
                   - type
                   type: object
@@ -76,15 +93,19 @@ spec:
                 type: array
               minReplicas:
                 description: MinReplicas is the lower limit for the number of replicas
-                  to which the target can be scaled
+                  to which the target can be scaled.
                 format: int32
                 minimum: 1
                 type: integer
+              pollingInterval:
+                description: PollingInterval is a best-effort target for how often
+                  the autoscaler should poll the metrics.
+                type: string
               scaleTargetRef:
-                description: ScaleTargetRef points to the target resource to scale
+                description: ScaleTargetRef points to the target resource to scale.
                 properties:
                   group:
-                    description: Group is the group of the target resource
+                    description: Group is the group of the target resource.
                     type: string
                   kind:
                     description: |-
@@ -100,6 +121,31 @@ spec:
                 - kind
                 - name
                 type: object
+              scalingBehavior:
+                description: ScalingBehavior is the way in which we scale the target
+                  to the desired replicas.
+                properties:
+                  scaleDown:
+                    description: ScaleDown is the scaling behavior for scaling down.
+                    properties:
+                      stabilizationWindowSeconds:
+                        description: |-
+                          StabilizationWindowSeconds is the number of seconds to wait before considering the system stable.
+                          A stabilization window of 0 seconds means the replica suggestion will be applied immediately.
+                          This may cause thrashing. A stabilization that is too long may cause the system to be unresponsive.
+                        type: string
+                    type: object
+                  scaleUp:
+                    description: ScaleUp is the scaling behavior for scaling up.
+                    properties:
+                      stabilizationWindowSeconds:
+                        description: |-
+                          StabilizationWindowSeconds is the number of seconds to wait before considering the system stable.
+                          A stabilization window of 0 seconds means the replica suggestion will be applied immediately.
+                          This may cause thrashing. A stabilization that is too long may cause the system to be unresponsive.
+                        type: string
+                    type: object
+                type: object
             required:
             - maxReplicas
             - metrics
@@ -108,14 +154,7 @@ spec:
             type: object
           status:
             description: HorizontalReplicaScalerStatus defines the observed state
-              of HorizontalReplicaScaler
-            properties:
-              info:
-                description: Info is a human-readable message about the status of
-                  the autoscaler
-                type: string
-            required:
-            - info
+              of HorizontalReplicaScaler.
             type: object
         type: object
     served: true
