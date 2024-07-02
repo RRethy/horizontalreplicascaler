@@ -4,22 +4,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 	clock "k8s.io/utils/clock/testing"
 )
 
 var initialTime = time.Date(1997, time.November, 7, 0, 0, 0, 0, time.UTC)
 
-func TestWindow_AddEvent(t *testing.T) {
+func TestWindow_Stabilize(t *testing.T) {
 	tests := []struct {
-		testName          string
-		rollingWindowType RollingWindowType
-		initialEvents     map[string][]Event
-		currentTime       time.Time
-		key               string
-		value             int32
-		windowDuration    time.Duration
-		expectedEvents    map[string][]Event
+		testName           string
+		rollingWindowType  RollingWindowType
+		initialEvents      map[string][]Event
+		currentTime        time.Time
+		key                string
+		value              int32
+		windowDuration     time.Duration
+		expectedEvents     map[string][]Event
+		expectedStabilized int32
 	}{
 		{
 			testName:          "max rolling window has max event at head",
@@ -38,6 +39,7 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 3, Timestamp: initialTime},
 				{Value: 2, Timestamp: initialTime.Add(1 * time.Millisecond)},
 			}},
+			expectedStabilized: 4,
 		},
 		{
 			testName:          "min rolling window has min event at head",
@@ -56,6 +58,7 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 3, Timestamp: initialTime},
 				{Value: 5, Timestamp: initialTime.Add(1 * time.Millisecond)},
 			}},
+			expectedStabilized: 1,
 		},
 		{
 			testName:          "values outside the window are removed",
@@ -74,6 +77,7 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 3, Timestamp: initialTime.Add(10 * time.Second)},
 				{Value: 1, Timestamp: initialTime.Add(11 * time.Second)},
 			}},
+			expectedStabilized: 4,
 		},
 		{
 			testName:          "values inside the window are kept",
@@ -93,6 +97,7 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 3, Timestamp: initialTime.Add(10 * time.Second)},
 				{Value: 1, Timestamp: initialTime.Add(11 * time.Second)},
 			}},
+			expectedStabilized: 6,
 		},
 		{
 			testName:          "stabilization window of 0 seconds keep single value",
@@ -109,6 +114,7 @@ func TestWindow_AddEvent(t *testing.T) {
 			expectedEvents: map[string][]Event{"foobar": {
 				{Value: 1, Timestamp: initialTime.Add(3 * time.Second)},
 			}},
+			expectedStabilized: 1,
 		},
 		{
 			testName:          "value greater than all others results in single value",
@@ -125,6 +131,7 @@ func TestWindow_AddEvent(t *testing.T) {
 			expectedEvents: map[string][]Event{"foobar": {
 				{Value: 10, Timestamp: initialTime.Add(3 * time.Second)},
 			}},
+			expectedStabilized: 10,
 		},
 		{
 			testName:          "max rolling keeps duplicate values",
@@ -143,6 +150,7 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 4, Timestamp: initialTime.Add(1 * time.Second)},
 				{Value: 4, Timestamp: initialTime.Add(3 * time.Second)},
 			}},
+			expectedStabilized: 6,
 		},
 		{
 			testName:          "min rolling keeps duplicate values",
@@ -161,13 +169,14 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 4, Timestamp: initialTime.Add(1 * time.Second)},
 				{Value: 4, Timestamp: initialTime.Add(3 * time.Second)},
 			}},
+			expectedStabilized: 2,
 		},
 		{
 			testName:          "multiple keys are handled independently",
 			rollingWindowType: MinRollingWindow,
 			initialEvents: map[string][]Event{
 				"foobar": {
-					{Value: 2, Timestamp: initialTime},
+					{Value: 3, Timestamp: initialTime},
 					{Value: 4, Timestamp: initialTime.Add(1 * time.Second)},
 					{Value: 5, Timestamp: initialTime.Add(2 * time.Second)},
 				},
@@ -183,7 +192,7 @@ func TestWindow_AddEvent(t *testing.T) {
 			windowDuration: 20 * time.Second,
 			expectedEvents: map[string][]Event{
 				"foobar": {
-					{Value: 2, Timestamp: initialTime},
+					{Value: 3, Timestamp: initialTime},
 					{Value: 4, Timestamp: initialTime.Add(1 * time.Second)},
 					{Value: 5, Timestamp: initialTime.Add(2 * time.Second)},
 				},
@@ -193,6 +202,7 @@ func TestWindow_AddEvent(t *testing.T) {
 					{Value: 4, Timestamp: initialTime.Add(3 * time.Second)},
 				},
 			},
+			expectedStabilized: 2,
 		},
 		{
 			testName:          "window is inclusive",
@@ -211,6 +221,7 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 3, Timestamp: initialTime.Add(2 * time.Second)},
 				{Value: 2, Timestamp: initialTime.Add(3 * time.Second)},
 			}},
+			expectedStabilized: 4,
 		},
 	}
 
@@ -218,8 +229,9 @@ func TestWindow_AddEvent(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			w := NewWindow(test.rollingWindowType, WithClock(clock.NewFakeClock(test.currentTime)))
 			w.RollingEvents = test.initialEvents
-			w.AddEvent(test.key, test.value, test.windowDuration)
-			require.Equal(t, test.expectedEvents, w.RollingEvents)
+			stabilized := w.Stabilize(test.key, test.value, test.windowDuration)
+			assert.Equal(t, test.expectedStabilized, stabilized)
+			assert.Equal(t, test.expectedEvents, w.RollingEvents)
 		})
 	}
 }
