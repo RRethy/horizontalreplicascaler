@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/record"
+	clock "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -38,6 +40,7 @@ var (
 	testEnv       *envtest.Environment
 	ctx           context.Context
 	cancel        context.CancelFunc
+	fakeclock     *clock.FakeClock
 )
 
 func TestControllers(t *testing.T) {
@@ -86,13 +89,15 @@ var _ = BeforeSuite(func() {
 	scaleClient, err = scale.NewForConfig(k8sManager.GetConfig(), k8sManager.GetRESTMapper(), dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	Expect(err).ToNot(HaveOccurred())
 
+	fakeclock = clock.NewFakeClock(time.Date(1997, time.November, 7, 0, 0, 0, 0, time.UTC))
+
 	err = (&HorizontalReplicaScalerReconciler{
 		Client:                       k8sManager.GetClient(),
 		Scheme:                       k8sManager.GetScheme(),
 		Recorder:                     eventRecorder,
 		ScaleClient:                  scaleClient,
-		ScaleDownStabilizationWindow: stabilization.NewWindow(stabilization.MaxRollingWindow),
-		ScaleUpStabilizationWindow:   stabilization.NewWindow(stabilization.MinRollingWindow),
+		ScaleDownStabilizationWindow: stabilization.NewWindow(stabilization.MaxRollingWindow, stabilization.WithClock(fakeclock)),
+		ScaleUpStabilizationWindow:   stabilization.NewWindow(stabilization.MinRollingWindow, stabilization.WithClock(fakeclock)),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
