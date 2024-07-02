@@ -41,6 +41,7 @@ type HorizontalReplicaScalerReconciler struct {
 	ScaleClient                  scale.ScalesGetter
 	PromAPI                      promv1.API
 	ScaleDownStabilizationWindow *stabilization.Window
+	ScaleUpStabilizationWindow   *stabilization.Window
 }
 
 // +kubebuilder:rbac:groups=scaling.rrethy.com,resources=horizontalreplicascalers,verbs=get;list;watch;create;update;patch;delete
@@ -88,7 +89,7 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 
 	desiredReplicas = r.applyMinMaxReplicas(horizontalReplicaScaler, desiredReplicas)
 
-	desiredReplicas = r.applyScalingBehaviour(horizontalReplicaScaler, desiredReplicas)
+	desiredReplicas = r.applyScalingBehavior(horizontalReplicaScaler, scaleSubresource.Spec.Replicas, desiredReplicas)
 
 	err = r.updateScaleSubresource(ctx, horizontalReplicaScaler, scaleSubresource, desiredReplicas)
 	if err != nil {
@@ -159,14 +160,29 @@ func (r *HorizontalReplicaScalerReconciler) applyMinMaxReplicas(horizontalReplic
 	return desiredReplicas
 }
 
-func (r *HorizontalReplicaScalerReconciler) applyScalingBehaviour(horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler, desiredReplicas int32) int32 {
-	// stabilizationWindowKey := stabilization.KeyFor(
-	// 	horizontalReplicaScaler.Namespace,
-	// 	horizontalReplicaScaler.Name,
-	// 	horizontalReplicaScaler.Spec.ScaleTargetRef.Name,
-	// 	horizontalReplicaScaler.Spec.ScaleTargetRef.Kind,
-	// 	horizontalReplicaScaler.Spec.ScaleTargetRef.Group,
-	// )
+func (r *HorizontalReplicaScalerReconciler) applyScalingBehavior(horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler, currentReplicas, desiredReplicas int32) int32 {
+	stabilizationWindowKey := stabilization.KeyFor(
+		horizontalReplicaScaler.Namespace,
+		horizontalReplicaScaler.Name,
+		horizontalReplicaScaler.Spec.ScaleTargetRef.Name,
+		horizontalReplicaScaler.Spec.ScaleTargetRef.Kind,
+		horizontalReplicaScaler.Spec.ScaleTargetRef.Group,
+	)
+
+	r.ScaleDownStabilizationWindow.AddEvent(stabilizationWindowKey, desiredReplicas, horizontalReplicaScaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow.Duration)
+	r.ScaleUpStabilizationWindow.AddEvent(stabilizationWindowKey, desiredReplicas, horizontalReplicaScaler.Spec.ScalingBehavior.ScaleUp.StabilizationWindow.Duration)
+
+	if desiredReplicas < currentReplicas {
+		replicas, ok := r.ScaleDownStabilizationWindow.GetStabilizedValue(stabilizationWindowKey)
+		if ok {
+			return replicas
+		}
+	} else if desiredReplicas > currentReplicas {
+		replicas, ok := r.ScaleUpStabilizationWindow.GetStabilizedValue(stabilizationWindowKey)
+		if ok {
+			return replicas
+		}
+	}
 
 	return desiredReplicas
 }

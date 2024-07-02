@@ -132,6 +132,7 @@ func main() {
 		ScaleClient:                  scaleClient,
 		PromAPI:                      promv1api,
 		ScaleDownStabilizationWindow: stabilization.NewWindow(stabilization.MaxRollingWindow),
+		ScaleUpStabilizationWindow:   stabilization.NewWindow(stabilization.MinRollingWindow),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HorizontalReplicaScaler")
 		os.Exit(1)

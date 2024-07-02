@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
+	"github.com/RRethy/horizontalreplicascaler/internal/stabilization"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -86,10 +87,12 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&HorizontalReplicaScalerReconciler{
-		Client:      k8sManager.GetClient(),
-		Scheme:      k8sManager.GetScheme(),
-		Recorder:    eventRecorder,
-		ScaleClient: scaleClient,
+		Client:                       k8sManager.GetClient(),
+		Scheme:                       k8sManager.GetScheme(),
+		Recorder:                     eventRecorder,
+		ScaleClient:                  scaleClient,
+		ScaleDownStabilizationWindow: stabilization.NewWindow(stabilization.MaxRollingWindow),
+		ScaleUpStabilizationWindow:   stabilization.NewWindow(stabilization.MinRollingWindow),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
