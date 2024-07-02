@@ -13,6 +13,13 @@ rules:
   - patch
   - update
 - apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
   - scaling.rrethy.com
   resources:
   - horizontalreplicascalers
