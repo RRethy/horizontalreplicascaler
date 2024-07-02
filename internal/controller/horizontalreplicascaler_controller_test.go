@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -93,10 +94,12 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 
 		BeforeEach(func() {
 			By("Creating a default deployment to scale")
-			Expect(k8sClient.Create(ctx, defaultDeployment)).To(Succeed())
+			deployment := defaultDeployment.DeepCopy()
+			Expect(k8sClient.Create(ctx, deployment)).To(Succeed())
 
 			By("Creating a new custom resource for the Kind HorizontalReplicaScaler")
-			Expect(k8sClient.Create(ctx, defaultHorizontalReplicaScaler)).To(Succeed())
+			scaler := defaultHorizontalReplicaScaler.DeepCopy()
+			Expect(k8sClient.Create(ctx, scaler)).To(Succeed())
 		})
 
 		AfterEach(func() {
@@ -104,13 +107,13 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 			Expect(k8sClient.Delete(ctx, defaultHorizontalReplicaScaler)).To(Succeed())
 
 			By("Getting the existing deployment")
-			deployment := &appsv1.Deployment{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, deployment)
+			var deployment appsv1.Deployment
+			err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)
 			Expect(err).To(SatisfyAny(BeNil(), WithTransform(errors.IsNotFound, BeTrue())))
 
 			if err == nil {
 				By("Cleaning up the deployment")
-				Expect(k8sClient.Delete(ctx, deployment)).To(Succeed())
+				Expect(k8sClient.Delete(ctx, &deployment)).To(Succeed())
 			}
 		})
 
@@ -130,6 +133,18 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 				Expect(err).ToNot(HaveOccurred())
 				return *deployment.Spec.Replicas
 			}, timeout, interval).Should(Equal(int32(5)))
+		})
+
+		It("Should create an event if the scale subresource does not exist", func() {
+			By("Changing the target name to a non-existent deployment")
+			var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
+			Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
+			nonExistentDeploymentName := "non-existent-deployment"
+			horizontalreplicascaler.Spec.ScaleTargetRef.Name = nonExistentDeploymentName
+			Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
+
+			By("Checking if the event was recorded")
+			Eventually(eventRecorder.Events).Should(Receive(ContainSubstring(fmt.Sprintf("\"%s\" not found", nonExistentDeploymentName))))
 		})
 	})
 })
