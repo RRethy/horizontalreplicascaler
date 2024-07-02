@@ -73,7 +73,8 @@ func NewWindow(rollingWindowType RollingWindowType, options ...Option) *Window {
 
 // Stabilize is a thread-safe method which adds an event to the rolling window for the given key,
 // and returns the stabilized value over the window duration.
-// It runs in O(n) time where n is the number of events in the stabilization window.
+// It takes amortized O(1) time to update the rolling window,
+// but O(n) time to write back to the status for bookkeeping.
 func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration, scaleRuleStatus *rrethyv1.ScaleRulesStatus) (stabilized int32) {
 	w.Mutex.Lock()
 	defer w.Mutex.Unlock()
