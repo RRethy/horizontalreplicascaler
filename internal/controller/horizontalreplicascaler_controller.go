@@ -51,6 +51,13 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 		return ctrl.Result{}, nil
 	}
 
+	defer func() {
+		err := r.Status().Update(ctx, horizontalReplicaScaler)
+		if err != nil {
+			log.Error(err, "updating status")
+		}
+	}()
+
 	log.Info("reconciling HorizontalReplicaScaler")
 	return ctrl.Result{}, nil
 }
