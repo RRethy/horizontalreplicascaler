@@ -71,14 +71,14 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 
 	scaleSubresource, err := r.getScaleSubresource(ctx, horizontalReplicaScaler)
 	if err != nil {
-		log.Error(err, "failed to get scale subresource")
+		log.Error(err, "getting scale subresource")
 		r.Recorder.Event(horizontalReplicaScaler, corev1.EventTypeWarning, EventReasonFailedGetScaleSubresource, err.Error())
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	metricResults, err := r.getMetricValues(ctx, horizontalReplicaScaler)
 	if err != nil {
-		log.Error(err, "failed to get metric results")
+		log.Error(err, "getting metric results")
 		return ctrl.Result{}, err
 	}
 
@@ -90,7 +90,7 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 
 	err = r.updateScaleSubresource(ctx, horizontalReplicaScaler, scaleSubresource, desiredReplicas)
 	if err != nil {
-		log.Error(err, "failed to update scale subresource")
+		log.Error(err, "updating scale subresource")
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -129,7 +129,7 @@ func (r *HorizontalReplicaScalerReconciler) getMetricValue(ctx context.Context, 
 	case "static":
 		target, err := strconv.ParseFloat(metric.Target.Value, 64)
 		if err != nil {
-			return metricValue{}, fmt.Errorf("parsing target value %s: %w", metric.Target, err)
+			return metricValue{}, fmt.Errorf("failed parsing target value %s: %w", metric.Target, err)
 		}
 		return metricValue{metric: metric, value: target}, nil
 	default:
