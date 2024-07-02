@@ -23,8 +23,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	rrethyv1 "github.com/RRethy/horizontalrpelicascaler/api/v1"
-	"github.com/RRethy/horizontalrpelicascaler/internal/controller"
+	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
+	"github.com/RRethy/horizontalreplicascaler/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 

@@ -10,8 +10,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,7 +22,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	rrethyv1 "github.com/RRethy/horizontalrpelicascaler/api/v1"
+	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -29,6 +32,7 @@ import (
 var (
 	cfg           *rest.Config
 	k8sClient     client.Client
+	scaleClient   scale.ScalesGetter
 	eventRecorder *record.FakeRecorder
 	testEnv       *envtest.Environment
 	ctx           context.Context
@@ -74,10 +78,18 @@ var _ = BeforeSuite(func() {
 
 	eventRecorder = record.NewFakeRecorder(10)
 
+	clientset, err := kubernetes.NewForConfig(k8sManager.GetConfig())
+	Expect(err).ToNot(HaveOccurred())
+
+	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(clientset.Discovery())
+	scaleClient, err = scale.NewForConfig(k8sManager.GetConfig(), k8sManager.GetRESTMapper(), dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	Expect(err).ToNot(HaveOccurred())
+
 	err = (&HorizontalReplicaScalerReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: eventRecorder,
+		Client:      k8sManager.GetClient(),
+		Scheme:      k8sManager.GetScheme(),
+		Recorder:    eventRecorder,
+		ScaleClient: scaleClient,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

@@ -6,7 +6,7 @@ domain: rrethy.com
 layout:
 - go.kubebuilder.io/v4
 projectName: horizonalreplicascaler
-repo: github.com/RRethy/horizontalrpelicascaler
+repo: github.com/RRethy/horizontalreplicascaler
 resources:
 - api:
     crdVersion: v1
@@ -15,6 +15,6 @@ resources:
   domain: rrethy.com
   group: scaling
   kind: HorizontalReplicaScaler
-  path: github.com/RRethy/horizontalrpelicascaler/api/v1
+  path: github.com/RRethy/horizontalreplicascaler/api/v1
   version: v1
 version: "3"

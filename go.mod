@@ -1,4 +1,4 @@
-module github.com/RRethy/horizontalrpelicascaler
+module github.com/RRethy/horizontalreplicascaler
 
 go 1.22.0
 

@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 
-	rrethyv1 "github.com/RRethy/horizontalrpelicascaler/api/v1"
+	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
 )
 
 const (
@@ -100,7 +100,7 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 		})
 
 		AfterEach(func() {
-			By("Cleanup the scaler")
+			By("Cleaning up the scaler")
 			Expect(k8sClient.Delete(ctx, defaultHorizontalReplicaScaler)).To(Succeed())
 
 			By("Getting the existing deployment")
@@ -109,9 +109,27 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 			Expect(err).To(SatisfyAny(BeNil(), WithTransform(errors.IsNotFound, BeTrue())))
 
 			if err == nil {
-				By("Cleanup the deployment")
+				By("Cleaning up the deployment")
 				Expect(k8sClient.Delete(ctx, deployment)).To(Succeed())
 			}
+		})
+
+		It("Should change the replica count to the static value", func() {
+			By("Getting the existing scaler")
+			var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
+			Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
+
+			By("Changing the static metric value in the scaler to trigger a reconcile")
+			horizontalreplicascaler.Spec.Metrics[0].Target.Value = "5"
+			Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
+
+			By("Getting the deployment to check the replica count")
+			Eventually(func() int32 {
+				var deployment appsv1.Deployment
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)
+				Expect(err).ToNot(HaveOccurred())
+				return *deployment.Spec.Replicas
+			}, timeout, interval).Should(Equal(int32(5)))
 		})
 	})
 })

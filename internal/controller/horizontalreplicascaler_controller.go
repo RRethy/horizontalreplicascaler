@@ -2,6 +2,9 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"time"
 
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -17,16 +20,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	rrethyv1 "github.com/RRethy/horizontalrpelicascaler/api/v1"
+	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
 )
 
 const (
 	EventReasonFailedGetScaleSubresource = "FailedGetScaleSubresource"
 )
 
-type MetricResult struct {
-	Type  string
-	Value float64
+type metricValue struct {
+	metric rrethyv1.MetricSpec
+	value  float64
 }
 
 // HorizontalReplicaScalerReconciler reconciles a HorizontalReplicaScaler object
@@ -72,9 +75,25 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 		r.Recorder.Event(horizontalReplicaScaler, corev1.EventTypeWarning, EventReasonFailedGetScaleSubresource, err.Error())
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.Info("scale subresource", ".spec.replicas", scaleSubresource.Spec.Replicas)
 
-	log.Info("reconciling HorizontalReplicaScaler")
+	metricResults, err := r.getMetricValues(ctx, horizontalReplicaScaler)
+	if err != nil {
+		log.Error(err, "failed to get metric results")
+		return ctrl.Result{}, err
+	}
+
+	desiredReplicas := r.getMaxMetricValues(metricResults)
+
+	desiredReplicas = r.applyMinMaxReplicas(horizontalReplicaScaler, desiredReplicas)
+
+	desiredReplicas = r.applyScalingBehaviour(horizontalReplicaScaler, desiredReplicas)
+
+	err = r.updateScaleSubresource(ctx, horizontalReplicaScaler, scaleSubresource, desiredReplicas)
+	if err != nil {
+		log.Error(err, "failed to update scale subresource")
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -89,4 +108,62 @@ func (r *HorizontalReplicaScalerReconciler) SetupWithManager(mgr ctrl.Manager) e
 func (r *HorizontalReplicaScalerReconciler) getScaleSubresource(ctx context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) (*autoscalingv1.Scale, error) {
 	gr := schema.GroupResource{Group: horizontalReplicaScaler.Spec.ScaleTargetRef.Group, Resource: horizontalReplicaScaler.Spec.ScaleTargetRef.Kind}
 	return r.ScaleClient.Scales(horizontalReplicaScaler.Namespace).Get(ctx, gr, horizontalReplicaScaler.Spec.ScaleTargetRef.Name, metav1.GetOptions{})
+}
+
+// getMetricResults returns the result of calculating each metric.
+func (r *HorizontalReplicaScalerReconciler) getMetricValues(ctx context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) ([]metricValue, error) {
+	var values []metricValue
+	for _, metric := range horizontalReplicaScaler.Spec.Metrics {
+		value, err := r.getMetricValue(ctx, metric)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	return values, nil
+}
+
+// getMetricResult returns the result of calculating a metric.
+func (r *HorizontalReplicaScalerReconciler) getMetricValue(ctx context.Context, metric rrethyv1.MetricSpec) (metricValue, error) {
+	switch metric.Type {
+	case "static":
+		target, err := strconv.ParseFloat(metric.Target.Value, 64)
+		if err != nil {
+			return metricValue{}, fmt.Errorf("parsing target value %s: %w", metric.Target, err)
+		}
+		return metricValue{metric: metric, value: target}, nil
+	default:
+		return metricValue{}, fmt.Errorf("unknown metric type %s", metric.Type)
+	}
+}
+
+func (r *HorizontalReplicaScalerReconciler) getMaxMetricValues(metricValues []metricValue) int32 {
+	var maxResult float64
+	for _, metricResult := range metricValues {
+		if metricResult.value > maxResult {
+			maxResult = metricResult.value
+		}
+	}
+	return int32(maxResult)
+}
+
+func (r *HorizontalReplicaScalerReconciler) applyMinMaxReplicas(horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler, desiredReplicas int32) int32 {
+	if desiredReplicas < horizontalReplicaScaler.Spec.MinReplicas {
+		return horizontalReplicaScaler.Spec.MinReplicas
+	}
+	if desiredReplicas > horizontalReplicaScaler.Spec.MaxReplicas {
+		return horizontalReplicaScaler.Spec.MaxReplicas
+	}
+	return desiredReplicas
+}
+
+func (r *HorizontalReplicaScalerReconciler) applyScalingBehaviour(horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler, desiredReplicas int32) int32 {
+	return desiredReplicas
+}
+
+func (r *HorizontalReplicaScalerReconciler) updateScaleSubresource(ctx context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler, scaleSubresource *autoscalingv1.Scale, desiredReplicas int32) error {
+	scaleSubresource.Spec.Replicas = desiredReplicas
+	gr := schema.GroupResource{Group: horizontalReplicaScaler.Spec.ScaleTargetRef.Group, Resource: horizontalReplicaScaler.Spec.ScaleTargetRef.Kind}
+	_, err := r.ScaleClient.Scales(horizontalReplicaScaler.Namespace).Update(ctx, gr, scaleSubresource, metav1.UpdateOptions{})
+	return err
 }
