@@ -131,5 +131,24 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 				return *deployment.Spec.Replicas
 			}, timeout, interval).Should(Equal(int32(9)))
 		})
+
+		It("Should respect min replicas", func() {
+			By("Getting the existing scaler")
+			var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
+			Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
+
+			By("Changing the static metric value to less than min replicas")
+			horizontalreplicascaler.Spec.Metrics[0].Target.Value = "2"
+			horizontalreplicascaler.Spec.MinReplicas = 5
+			Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
+
+			By("Getting the deployment to check the replica count")
+			Eventually(func() int32 {
+				var deployment appsv1.Deployment
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)
+				Expect(err).ToNot(HaveOccurred())
+				return *deployment.Spec.Replicas
+			}, timeout, interval).Should(Equal(int32(5)))
+		})
 	})
 })
