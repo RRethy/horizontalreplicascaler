@@ -5,7 +5,10 @@ import (
 	"sync"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/clock"
+
+	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
 )
 
 // RollingWindowType is the type of rolling window.
@@ -35,12 +38,6 @@ func WithClock(clock clock.Clock) Option {
 	}
 }
 
-// Event represents a value in the rolling window at a given time.
-type Event struct {
-	Value     int32
-	Timestamp time.Time
-}
-
 // Window is a thread-safe struct that implements keyed rolling windows.
 // The window will only keep track of events that are within a given window duration.
 type Window struct {
@@ -55,7 +52,7 @@ type Window struct {
 	// RollingEvents is a map of keys to a list of events.
 	// Only events that are within the window duration,
 	// and can be the min/max are kept.
-	RollingEvents map[string][]Event
+	RollingEvents map[string][]rrethyv1.ScaleEvent
 }
 
 // NewWindow creates a new Window with the given rolling window type and options.
@@ -64,7 +61,7 @@ func NewWindow(rollingWindowType RollingWindowType, options ...Option) *Window {
 		Clock:         clock.RealClock{},
 		Mutex:         sync.RWMutex{},
 		Type:          rollingWindowType,
-		RollingEvents: make(map[string][]Event),
+		RollingEvents: make(map[string][]rrethyv1.ScaleEvent),
 	}
 
 	for _, option := range options {
@@ -76,9 +73,8 @@ func NewWindow(rollingWindowType RollingWindowType, options ...Option) *Window {
 
 // Stabilize is a thread-safe method which adds an event to the rolling window for the given key,
 // and returns the stabilized value over the window duration.
-// It runs in amortized O(1) time.
-// TODO: pass in status
-func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration) (stabilized int32) {
+// It runs in O(n) time where n is the number of events in the stabilization window.
+func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration, scaleRuleStatus *rrethyv1.ScaleRulesStatus) (stabilized int32) {
 	w.Mutex.Lock()
 	defer w.Mutex.Unlock()
 
@@ -102,7 +98,14 @@ func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration
 		panic("invalid rolling window type")
 	}
 
-	window = append(window, Event{Value: value, Timestamp: t})
+	window = append(window, rrethyv1.ScaleEvent{Value: value, Timestamp: metav1.NewTime(t)})
 	w.RollingEvents[key] = window
+
+	var stabilizationWindowStatus []rrethyv1.ScaleEvent
+	for _, event := range window {
+		stabilizationWindowStatus = append(stabilizationWindowStatus, event)
+	}
+	scaleRuleStatus.StabilizationWindow = stabilizationWindowStatus
+
 	return window[0].Value
 }
