@@ -18,7 +18,7 @@ func TestWindow_AddEvent(t *testing.T) {
 		currentTime       time.Time
 		key               string
 		value             int32
-		windowSeconds     int32
+		windowDuration    time.Duration
 		expectedEvents    map[string][]Event
 	}{
 		{
@@ -29,10 +29,10 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 3, Timestamp: initialTime},
 				{Value: 1, Timestamp: initialTime},
 			}},
-			currentTime:   initialTime.Add(1 * time.Millisecond),
-			key:           "foobar",
-			value:         2,
-			windowSeconds: 10000,
+			currentTime:    initialTime.Add(1 * time.Millisecond),
+			key:            "foobar",
+			value:          2,
+			windowDuration: 10000 * time.Second,
 			expectedEvents: map[string][]Event{"foobar": {
 				{Value: 4, Timestamp: initialTime},
 				{Value: 3, Timestamp: initialTime},
@@ -47,10 +47,10 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 3, Timestamp: initialTime},
 				{Value: 7, Timestamp: initialTime},
 			}},
-			currentTime:   initialTime.Add(1 * time.Millisecond),
-			key:           "foobar",
-			value:         5,
-			windowSeconds: 1,
+			currentTime:    initialTime.Add(1 * time.Millisecond),
+			key:            "foobar",
+			value:          5,
+			windowDuration: 1 * time.Second,
 			expectedEvents: map[string][]Event{"foobar": {
 				{Value: 1, Timestamp: initialTime},
 				{Value: 3, Timestamp: initialTime},
@@ -65,10 +65,10 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 4, Timestamp: initialTime.Add(5 * time.Second)},
 				{Value: 3, Timestamp: initialTime.Add(10 * time.Second)},
 			}},
-			currentTime:   initialTime.Add(11 * time.Second),
-			key:           "foobar",
-			value:         1,
-			windowSeconds: 10,
+			currentTime:    initialTime.Add(11 * time.Second),
+			key:            "foobar",
+			value:          1,
+			windowDuration: 10 * time.Second,
 			expectedEvents: map[string][]Event{"foobar": {
 				{Value: 4, Timestamp: initialTime.Add(5 * time.Second)},
 				{Value: 3, Timestamp: initialTime.Add(10 * time.Second)},
@@ -83,10 +83,10 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 4, Timestamp: initialTime.Add(5 * time.Second)},
 				{Value: 3, Timestamp: initialTime.Add(10 * time.Second)},
 			}},
-			currentTime:   initialTime.Add(11 * time.Second),
-			key:           "foobar",
-			value:         1,
-			windowSeconds: 20,
+			currentTime:    initialTime.Add(11 * time.Second),
+			key:            "foobar",
+			value:          1,
+			windowDuration: 20 * time.Second,
 			expectedEvents: map[string][]Event{"foobar": {
 				{Value: 6, Timestamp: initialTime},
 				{Value: 4, Timestamp: initialTime.Add(5 * time.Second)},
@@ -102,10 +102,10 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 4, Timestamp: initialTime.Add(1 * time.Second)},
 				{Value: 3, Timestamp: initialTime.Add(2 * time.Second)},
 			}},
-			currentTime:   initialTime.Add(3 * time.Second),
-			key:           "foobar",
-			value:         1,
-			windowSeconds: 0,
+			currentTime:    initialTime.Add(3 * time.Second),
+			key:            "foobar",
+			value:          1,
+			windowDuration: 0 * time.Second,
 			expectedEvents: map[string][]Event{"foobar": {
 				{Value: 1, Timestamp: initialTime.Add(3 * time.Second)},
 			}},
@@ -118,10 +118,10 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 4, Timestamp: initialTime.Add(1 * time.Second)},
 				{Value: 3, Timestamp: initialTime.Add(2 * time.Second)},
 			}},
-			currentTime:   initialTime.Add(3 * time.Second),
-			key:           "foobar",
-			value:         10,
-			windowSeconds: 20,
+			currentTime:    initialTime.Add(3 * time.Second),
+			key:            "foobar",
+			value:          10,
+			windowDuration: 20 * time.Second,
 			expectedEvents: map[string][]Event{"foobar": {
 				{Value: 10, Timestamp: initialTime.Add(3 * time.Second)},
 			}},
@@ -134,10 +134,10 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 4, Timestamp: initialTime.Add(1 * time.Second)},
 				{Value: 3, Timestamp: initialTime.Add(2 * time.Second)},
 			}},
-			currentTime:   initialTime.Add(3 * time.Second),
-			key:           "foobar",
-			value:         4,
-			windowSeconds: 20,
+			currentTime:    initialTime.Add(3 * time.Second),
+			key:            "foobar",
+			value:          4,
+			windowDuration: 20 * time.Second,
 			expectedEvents: map[string][]Event{"foobar": {
 				{Value: 6, Timestamp: initialTime},
 				{Value: 4, Timestamp: initialTime.Add(1 * time.Second)},
@@ -152,10 +152,10 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 4, Timestamp: initialTime.Add(1 * time.Second)},
 				{Value: 5, Timestamp: initialTime.Add(2 * time.Second)},
 			}},
-			currentTime:   initialTime.Add(3 * time.Second),
-			key:           "foobar",
-			value:         4,
-			windowSeconds: 20,
+			currentTime:    initialTime.Add(3 * time.Second),
+			key:            "foobar",
+			value:          4,
+			windowDuration: 20 * time.Second,
 			expectedEvents: map[string][]Event{"foobar": {
 				{Value: 2, Timestamp: initialTime},
 				{Value: 4, Timestamp: initialTime.Add(1 * time.Second)},
@@ -177,10 +177,10 @@ func TestWindow_AddEvent(t *testing.T) {
 					{Value: 5, Timestamp: initialTime.Add(2 * time.Second)},
 				},
 			},
-			currentTime:   initialTime.Add(3 * time.Second),
-			key:           "barfoo",
-			value:         4,
-			windowSeconds: 20,
+			currentTime:    initialTime.Add(3 * time.Second),
+			key:            "barfoo",
+			value:          4,
+			windowDuration: 20 * time.Second,
 			expectedEvents: map[string][]Event{
 				"foobar": {
 					{Value: 2, Timestamp: initialTime},
@@ -202,10 +202,10 @@ func TestWindow_AddEvent(t *testing.T) {
 				{Value: 4, Timestamp: initialTime.Add(1 * time.Second)},
 				{Value: 3, Timestamp: initialTime.Add(2 * time.Second)},
 			}},
-			currentTime:   initialTime.Add(3 * time.Second),
-			key:           "foobar",
-			value:         2,
-			windowSeconds: 2,
+			currentTime:    initialTime.Add(3 * time.Second),
+			key:            "foobar",
+			value:          2,
+			windowDuration: 2 * time.Second,
 			expectedEvents: map[string][]Event{"foobar": {
 				{Value: 4, Timestamp: initialTime.Add(1 * time.Second)},
 				{Value: 3, Timestamp: initialTime.Add(2 * time.Second)},
@@ -218,7 +218,7 @@ func TestWindow_AddEvent(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			w := NewWindow(test.rollingWindowType, WithClock(clock.NewFakeClock(test.currentTime)))
 			w.RollingEvents = test.initialEvents
-			w.AddEvent(test.key, test.value, test.windowSeconds)
+			w.AddEvent(test.key, test.value, test.windowDuration)
 			require.Equal(t, test.expectedEvents, w.RollingEvents)
 		})
 	}

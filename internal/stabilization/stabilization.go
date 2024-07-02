@@ -55,15 +55,14 @@ func NewWindow(rollingWindowType RollingWindowType, options ...Option) *Window {
 }
 
 // TODO: pass in status
-// TODO: don't use seconds
-func (w *Window) AddEvent(key string, value, windowSeconds int32) {
+func (w *Window) AddEvent(key string, value int32, windowDuration time.Duration) {
 	w.Mutex.Lock()
 	defer w.Mutex.Unlock()
 
 	window := w.RollingEvents[key]
 	t := w.Clock.Now()
 
-	for len(window) > 0 && window[0].Timestamp.Add(time.Duration(windowSeconds)*time.Second).Before(t) {
+	for len(window) > 0 && window[0].Timestamp.Add(windowDuration).Before(t) {
 		window = window[1:]
 	}
 
