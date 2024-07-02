@@ -5,11 +5,13 @@ import (
 
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	rrethyv1 "github.com/RRethy/horizontalrpelicascaler/api/v1"
 )
@@ -38,20 +40,17 @@ type HorizontalReplicaScalerReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.2/pkg/reconcile
-func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx).WithValues("horizontalreplicascaler", req.NamespacedName)
-
-	var horizontalReplicaScaler rrethyv1.HorizontalReplicaScaler
-	if err := r.Get(ctx, req.NamespacedName, &horizontalReplicaScaler); err != nil {
-		log.Error(err, "unable to fetch HorizontalReplicaScaler")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
+// This Reconcile method uses the ObjectReconciler interface from https://github.com/kubernetes-sigs/controller-runtime/pull/2592.
+func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) (ctrl.Result, error) {
+	nsName := types.NamespacedName{Namespace: horizontalReplicaScaler.Namespace, Name: horizontalReplicaScaler.Name}
+	log := log.FromContext(ctx).WithValues("horizontalreplicascaler", nsName)
 
 	if !horizontalReplicaScaler.DeletionTimestamp.IsZero() {
 		// The object is being deleted, don't do anything.
 		return ctrl.Result{}, nil
 	}
 
+	log.Info("reconciling HorizontalReplicaScaler")
 	return ctrl.Result{}, nil
 }
 
@@ -59,5 +58,5 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, req c
 func (r *HorizontalReplicaScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&rrethyv1.HorizontalReplicaScaler{}).
-		Complete(r)
+		Complete(reconcile.AsReconciler(mgr.GetClient(), r))
 }
