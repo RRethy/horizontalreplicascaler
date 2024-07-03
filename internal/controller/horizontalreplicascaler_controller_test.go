@@ -12,17 +12,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 
 	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
 )
 
 const (
-	timeout        = time.Second * 20
-	interval       = time.Millisecond * 250
-	scalerName     = "test-scaler"
-	namespace      = "default"
-	deploymentName = "test-deployment"
+	timeout                = time.Second * 20
+	interval               = time.Millisecond * 250
+	scalerName             = "test-scaler"
+	namespace              = "default"
+	deploymentName         = "test-deployment"
+	initialDeploymentScale = 10
+	initialMaxReplicas     = 20
+	initialMinReplicas     = 3
 )
 
 var (
@@ -33,7 +35,6 @@ var (
 	defaultDeployment = &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: deploymentName, Namespace: namespace},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: ptr.To[int32](3),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "test"}},
@@ -47,9 +48,9 @@ var (
 		ObjectMeta: metav1.ObjectMeta{Name: scalerName, Namespace: namespace},
 		Spec: rrethyv1.HorizontalReplicaScalerSpec{
 			ScaleTargetRef: &rrethyv1.ScaleTargetRef{Group: "apps", Kind: "Deployment", Name: deploymentName},
-			MinReplicas:    3,
-			MaxReplicas:    10,
-			Metrics:        []rrethyv1.MetricSpec{{Type: "static", Target: rrethyv1.TargetSec{Type: "value", Value: "10"}}},
+			MinReplicas:    initialMinReplicas,
+			MaxReplicas:    initialMaxReplicas,
+			Metrics:        []rrethyv1.MetricSpec{{Type: "static", Target: rrethyv1.TargetSec{Type: "value", Value: fmt.Sprintf("%d", initialDeploymentScale)}}},
 		},
 	}
 )
@@ -64,6 +65,14 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 
 			By("Creating a new custom resource for the Kind HorizontalReplicaScaler")
 			Expect(k8sClient.Create(ctx, defaultHorizontalReplicaScaler.DeepCopy())).To(Succeed())
+
+			By("Waiting for the deployment to scale based on the default scaler")
+			Eventually(func() int32 {
+				var deployment appsv1.Deployment
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)
+				Expect(err).ToNot(HaveOccurred())
+				return *deployment.Spec.Replicas
+			}, timeout, interval).Should(Equal(int32(10)))
 		})
 
 		AfterEach(func() {
@@ -168,6 +177,35 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 				Expect(err).ToNot(HaveOccurred())
 				return *deployment.Spec.Replicas
 			}, timeout, interval).Should(Equal(int32(10)))
+		})
+
+		It("Should scale down according to the stabilization window", func() {
+			// By("Getting the existing scaler")
+			// var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
+			// Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
+			//
+			// By("Changing the scale down stabilization window to 1 second")
+			// horizontalreplicascaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow = metav1.Duration{Duration: 1 * time.Second}
+			// horizontalreplicascaler.Spec.Metrics[0].Target.Value = "2"
+			// Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
+		})
+
+		It("Should scale up freely when only a scale down stabilization window is set", func() {
+		})
+
+		It("Should not scale down if any event in the stabilization window is a scale up event", func() {
+		})
+
+		It("Should scale up according to the stabilization window", func() {
+		})
+
+		It("Should scale down freely when only a scale up stabilization window is set", func() {
+		})
+
+		It("Should not scale up if any event in the stabilization window is a scale down event", func() {
+		})
+
+		It("Should not scale if the desired replicas is thrashing and we have scale up and down stabilization", func() {
 		})
 	})
 })
