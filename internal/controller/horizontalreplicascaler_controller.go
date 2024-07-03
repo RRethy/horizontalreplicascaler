@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -57,8 +56,7 @@ type HorizontalReplicaScalerReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.2/pkg/reconcile
 // This Reconcile method uses the ObjectReconciler interface from https://github.com/kubernetes-sigs/controller-runtime/pull/2592.
 func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) (ctrl.Result, error) {
-	nsName := types.NamespacedName{Namespace: horizontalReplicaScaler.Namespace, Name: horizontalReplicaScaler.Name}
-	log := log.FromContext(ctx).WithValues("horizontalreplicascaler", nsName)
+	log := log.FromContext(ctx)
 
 	pollingInterval := horizontalReplicaScaler.Spec.PollingInterval.Duration
 

@@ -103,12 +103,29 @@ func TestWindow_Stabilize(t *testing.T) {
 			expectedStabilized: 6,
 		},
 		{
-			testName:          "stabilization window of 0 seconds keep single value",
+			testName:          "max stabilization window of 0 seconds keep single value",
 			rollingWindowType: MaxRollingWindow,
 			initialEvents: map[string][]rrethyv1.ScaleEvent{"foobar": {
 				{Value: 6, Timestamp: initialTime},
 				{Value: 4, Timestamp: metav1.NewTime(initialTime.Add(1 * time.Second))},
 				{Value: 3, Timestamp: metav1.NewTime(initialTime.Add(2 * time.Second))},
+			}},
+			currentTime:    initialTime.Add(3 * time.Second),
+			key:            "foobar",
+			value:          1,
+			windowDuration: 0 * time.Second,
+			expectedEvents: map[string][]rrethyv1.ScaleEvent{"foobar": {
+				{Value: 1, Timestamp: metav1.NewTime(initialTime.Add(3 * time.Second))},
+			}},
+			expectedStabilized: 1,
+		},
+		{
+			testName:          "min stabilization window of 0 seconds keep single value",
+			rollingWindowType: MinRollingWindow,
+			initialEvents: map[string][]rrethyv1.ScaleEvent{"foobar": {
+				{Value: 3, Timestamp: metav1.NewTime(initialTime.Add(2 * time.Second))},
+				{Value: 4, Timestamp: metav1.NewTime(initialTime.Add(1 * time.Second))},
+				{Value: 6, Timestamp: initialTime},
 			}},
 			currentTime:    initialTime.Add(3 * time.Second),
 			key:            "foobar",
