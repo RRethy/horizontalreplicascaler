@@ -44,6 +44,16 @@ type ScalingBehavior struct {
 	ScaleDown ScalingRules `json:"scaleDown,omitempty"`
 }
 
+// Fallback defines the fallback behavior when failures occur.
+type Fallback struct {
+	// Replicas is the number of replicas to scale to when metrics fail.
+	// +kubebuilder:validation:Required
+	Replicas int32 `json:"replicas"`
+
+	// Threshold is the number of consecutive failures before the fallback is triggered.
+	Threshold int32 `json:"threshold"`
+}
+
 // TargetSec defines the target that should be scaled towards.
 type TargetSec struct {
 	// Type is the type of the target.
@@ -74,9 +84,14 @@ type MetricSpec struct {
 
 // HorizontalReplicaScalerSpec defines the desired state of HorizontalReplicaScaler.
 type HorizontalReplicaScalerSpec struct {
+	// DryRun is a flag to indicate if the target workload should not actually be scaled.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Default=false
+	DryRun bool `json:"dryRun"`
+
 	// ScaleTargetRef points to the target resource to scale.
 	// +kubebuilder:validation:Required
-	ScaleTargetRef *ScaleTargetRef `json:"scaleTargetRef"`
+	ScaleTargetRef ScaleTargetRef `json:"scaleTargetRef"`
 
 	// MinReplicas is the lower limit for the number of replicas to which the target can be scaled.
 	// +kubebuilder:validation:Required
@@ -88,14 +103,19 @@ type HorizontalReplicaScalerSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	MaxReplicas int32 `json:"maxReplicas"`
 
-	// ScalingBehavior is the way in which we scale the target to the desired replicas.
-	// +kubebuilder:validation:Optional
-	ScalingBehavior ScalingBehavior `json:"scalingBehavior,omitempty"`
-
 	// PollingInterval is a best-effort target for how often the autoscaler should poll the metrics.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Default=30s
 	PollingInterval metav1.Duration `json:"pollingInterval"`
+
+	// ScalingBehavior is the way in which we scale the target to the desired replicas.
+	// +kubebuilder:validation:Optional
+	ScalingBehavior ScalingBehavior `json:"scalingBehavior,omitempty"`
+
+	// Fallback is the fallback behavior for the autoscaler when metrics fail.
+	// The fallback applies to each metric individually.
+	// +kubebuilder:validation:Optional
+	Fallback *Fallback `json:"fallback,omitempty"`
 
 	// Metrics is a list of metrics the autoscaler should use to scale the target.
 	// +kubebuilder:validation:Required
@@ -114,29 +134,11 @@ type ScaleEvent struct {
 	Timestamp metav1.Time `json:"timestamp"`
 }
 
-// ScaleRulesStatus defines the observed state of ScaleRules.
-type ScaleRulesStatus struct {
-	// StabilizationWindow is the observed events in the stabilization window for the scaling rule.
-	// +kubebuilder:validation:Optional
-	StabilizationWindow []ScaleEvent `json:"stabilizationWindow"`
-}
-
-// ScalingBehaviorStatus defines the observed state of ScalingBehavior.
-type ScalingBehaviorStatus struct {
-	// ScaleUp is the scaling behavior status for scaling up.
-	// +kubebuilder:validation:Optional
-	ScaleUp ScaleRulesStatus `json:"scaleUp"`
-
-	// ScaleDown is the scaling behavior status for scaling down.
-	// +kubebuilder:validation:Optional
-	ScaleDown ScaleRulesStatus `json:"scaleDown"`
-}
-
 // HorizontalReplicaScalerStatus defines the observed state of HorizontalReplicaScaler.
 type HorizontalReplicaScalerStatus struct {
-	// ScalingBehaviourStatus is the observed state of the scaling behaviors.
+	// DesiredReplicas is the number of replicas the target should be scaled to.
 	// +kubebuilder:validation:Optional
-	ScalingBehaviourStatus ScalingBehaviorStatus `json:"scalingBehaviourStatus"`
+	DesiredReplicas int32 `json:"desiredReplicas"`
 }
 
 // +kubebuilder:object:root=true

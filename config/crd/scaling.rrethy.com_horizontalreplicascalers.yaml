@@ -45,6 +45,29 @@ spec:
             description: HorizontalReplicaScalerSpec defines the desired state of
               HorizontalReplicaScaler.
             properties:
+              dryRun:
+                description: DryRun is a flag to indicate if the target workload should
+                  not actually be scaled.
+                type: boolean
+              fallback:
+                description: |-
+                  Fallback is the fallback behavior for the autoscaler when metrics fail.
+                  The fallback applies to each metric individually.
+                properties:
+                  replicas:
+                    description: Replicas is the number of replicas to scale to when
+                      metrics fail.
+                    format: int32
+                    type: integer
+                  threshold:
+                    description: Threshold is the number of consecutive failures before
+                      the fallback is triggered.
+                    format: int32
+                    type: integer
+                required:
+                - replicas
+                - threshold
+                type: object
               maxReplicas:
                 description: MaxReplicas is the upper limit for the number of replicas
                   to which the target can be scaled.
@@ -156,65 +179,11 @@ spec:
             description: HorizontalReplicaScalerStatus defines the observed state
               of HorizontalReplicaScaler.
             properties:
-              scalingBehaviourStatus:
-                description: ScalingBehaviourStatus is the observed state of the scaling
-                  behaviors.
-                properties:
-                  scaleDown:
-                    description: ScaleDown is the scaling behavior status for scaling
-                      down.
-                    properties:
-                      stabilizationWindow:
-                        description: StabilizationWindow is the observed events in
-                          the stabilization window for the scaling rule.
-                        items:
-                          description: ScaleEvent defines an event in the stabilization
-                            window for the scaling rule.
-                          properties:
-                            timestamp:
-                              description: Timestamp is the timestamp of the scale
-                                event.
-                              format: date-time
-                              type: string
-                            value:
-                              description: Value is the replica value for the scale
-                                event.
-                              format: int32
-                              type: integer
-                          required:
-                          - timestamp
-                          - value
-                          type: object
-                        type: array
-                    type: object
-                  scaleUp:
-                    description: ScaleUp is the scaling behavior status for scaling
-                      up.
-                    properties:
-                      stabilizationWindow:
-                        description: StabilizationWindow is the observed events in
-                          the stabilization window for the scaling rule.
-                        items:
-                          description: ScaleEvent defines an event in the stabilization
-                            window for the scaling rule.
-                          properties:
-                            timestamp:
-                              description: Timestamp is the timestamp of the scale
-                                event.
-                              format: date-time
-                              type: string
-                            value:
-                              description: Value is the replica value for the scale
-                                event.
-                              format: int32
-                              type: integer
-                          required:
-                          - timestamp
-                          - value
-                          type: object
-                        type: array
-                    type: object
-                type: object
+              desiredReplicas:
+                description: DesiredReplicas is the number of replicas the target
+                  should be scaled to.
+                format: int32
+                type: integer
             type: object
         type: object
     served: true

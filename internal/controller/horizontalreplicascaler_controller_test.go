@@ -47,7 +47,7 @@ var (
 	defaultHorizontalReplicaScaler = &rrethyv1.HorizontalReplicaScaler{
 		ObjectMeta: metav1.ObjectMeta{Name: scalerName, Namespace: namespace},
 		Spec: rrethyv1.HorizontalReplicaScalerSpec{
-			ScaleTargetRef: &rrethyv1.ScaleTargetRef{Group: "apps", Kind: "Deployment", Name: deploymentName},
+			ScaleTargetRef: rrethyv1.ScaleTargetRef{Group: "apps", Kind: "Deployment", Name: deploymentName},
 			MinReplicas:    initialMinReplicas,
 			MaxReplicas:    initialMaxReplicas,
 			Metrics:        []rrethyv1.MetricSpec{{Type: "static", Target: rrethyv1.TargetSec{Type: "value", Value: fmt.Sprintf("%d", initialDeploymentScale)}}},

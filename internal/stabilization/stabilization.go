@@ -75,7 +75,7 @@ func NewWindow(rollingWindowType RollingWindowType, options ...Option) *Window {
 // and returns the stabilized value over the window duration.
 // It takes amortized O(1) time to update the rolling window,
 // but O(n) time to write back to the status for bookkeeping.
-func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration, scaleRuleStatus *rrethyv1.ScaleRulesStatus) (stabilized int32) {
+func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration) (stabilized int32) {
 	w.Mutex.Lock()
 	defer w.Mutex.Unlock()
 
@@ -106,7 +106,6 @@ func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration
 
 	window = append(window, rrethyv1.ScaleEvent{Value: value, Timestamp: metav1.NewTime(t)})
 	w.RollingEvents[key] = window
-	scaleRuleStatus.StabilizationWindow = append([]rrethyv1.ScaleEvent(nil), window...)
 
 	return window[0].Value
 }

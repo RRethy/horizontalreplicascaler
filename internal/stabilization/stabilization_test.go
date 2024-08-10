@@ -249,11 +249,9 @@ func TestWindow_Stabilize(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			w := NewWindow(test.rollingWindowType, WithClock(clock.NewFakeClock(test.currentTime)))
 			w.RollingEvents = test.initialEvents
-			var status rrethyv1.ScaleRulesStatus
-			stabilized := w.Stabilize(test.key, test.value, test.windowDuration, &status)
+			stabilized := w.Stabilize(test.key, test.value, test.windowDuration)
 			assert.Equal(t, test.expectedStabilized, stabilized)
 			assert.Equal(t, test.expectedEvents, w.RollingEvents)
-			assert.Equal(t, test.expectedEvents[test.key], status.StabilizationWindow)
 		})
 	}
 }

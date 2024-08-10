@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -169,26 +170,15 @@ func (r *HorizontalReplicaScalerReconciler) applyScalingBehavior(horizontalRepli
 		horizontalReplicaScaler.Spec.ScaleTargetRef.Kind,
 		horizontalReplicaScaler.Spec.ScaleTargetRef.Group,
 	)
-
-	stabilizedDownScale := r.ScaleDownStabilizationWindow.Stabilize(
-		stabilizationWindowKey,
-		desiredReplicas,
-		horizontalReplicaScaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow.Duration,
-		&horizontalReplicaScaler.Status.ScalingBehaviourStatus.ScaleDown,
-	)
-	stabilizedUpScale := r.ScaleUpStabilizationWindow.Stabilize(
-		stabilizationWindowKey,
-		desiredReplicas,
-		horizontalReplicaScaler.Spec.ScalingBehavior.ScaleUp.StabilizationWindow.Duration,
-		&horizontalReplicaScaler.Status.ScalingBehaviourStatus.ScaleUp,
-	)
+	stabilizedDownScale := r.ScaleDownStabilizationWindow.Stabilize(stabilizationWindowKey, desiredReplicas, horizontalReplicaScaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow.Duration)
+	stabilizedUpScale := r.ScaleUpStabilizationWindow.Stabilize(stabilizationWindowKey, desiredReplicas, horizontalReplicaScaler.Spec.ScalingBehavior.ScaleUp.StabilizationWindow.Duration)
 
 	if desiredReplicas < currentReplicas {
-		return stabilizedDownScale
+		return slices.Min([]int32{stabilizedDownScale, currentReplicas})
 	} else if desiredReplicas > currentReplicas {
-		return stabilizedUpScale
+		return slices.Max([]int32{stabilizedUpScale, currentReplicas})
 	}
-	return desiredReplicas
+	return currentReplicas
 }
 
 func (r *HorizontalReplicaScalerReconciler) updateScaleSubresource(ctx context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler, scaleSubresource *autoscalingv1.Scale, desiredReplicas int32) error {
