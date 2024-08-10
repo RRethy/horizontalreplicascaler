@@ -80,7 +80,7 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 		return ctrl.Result{RequeueAfter: pollingInterval}, client.IgnoreNotFound(err)
 	}
 
-	metricResults, err := r.getMetricValues(ctx, horizontalReplicaScaler)
+	metricResults, err := r.getMetricValues(horizontalReplicaScaler)
 	if err != nil {
 		log.Error(err, "getting metric results")
 		return ctrl.Result{RequeueAfter: pollingInterval}, err
@@ -116,10 +116,10 @@ func (r *HorizontalReplicaScalerReconciler) getScaleSubresource(ctx context.Cont
 }
 
 // getMetricResults returns the result of calculating each metric.
-func (r *HorizontalReplicaScalerReconciler) getMetricValues(ctx context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) ([]metricValue, error) {
+func (r *HorizontalReplicaScalerReconciler) getMetricValues(horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) ([]metricValue, error) {
 	var values []metricValue
 	for _, metric := range horizontalReplicaScaler.Spec.Metrics {
-		value, err := r.getMetricValue(ctx, metric)
+		value, err := r.getMetricValue(metric)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +129,7 @@ func (r *HorizontalReplicaScalerReconciler) getMetricValues(ctx context.Context,
 }
 
 // getMetricResult returns the result of calculating a metric.
-func (r *HorizontalReplicaScalerReconciler) getMetricValue(ctx context.Context, metric rrethyv1.MetricSpec) (metricValue, error) {
+func (r *HorizontalReplicaScalerReconciler) getMetricValue(metric rrethyv1.MetricSpec) (metricValue, error) {
 	switch metric.Type {
 	case "static":
 		target, err := strconv.ParseFloat(metric.Target.Value, 64)
@@ -182,8 +182,13 @@ func (r *HorizontalReplicaScalerReconciler) applyScalingBehavior(horizontalRepli
 }
 
 func (r *HorizontalReplicaScalerReconciler) updateScaleSubresource(ctx context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler, scaleSubresource *autoscalingv1.Scale, desiredReplicas int32) error {
-	scaleSubresource.Spec.Replicas = desiredReplicas
-	gr := schema.GroupResource{Group: horizontalReplicaScaler.Spec.ScaleTargetRef.Group, Resource: horizontalReplicaScaler.Spec.ScaleTargetRef.Kind}
-	_, err := r.ScaleClient.Scales(horizontalReplicaScaler.Namespace).Update(ctx, gr, scaleSubresource, metav1.UpdateOptions{})
+	var err error
+	if horizontalReplicaScaler.Spec.DryRun {
+		horizontalReplicaScaler.Status.DesiredReplicas = desiredReplicas
+	} else {
+		scaleSubresource.Spec.Replicas = desiredReplicas
+		gr := schema.GroupResource{Group: horizontalReplicaScaler.Spec.ScaleTargetRef.Group, Resource: horizontalReplicaScaler.Spec.ScaleTargetRef.Kind}
+		_, err = r.ScaleClient.Scales(horizontalReplicaScaler.Namespace).Update(ctx, gr, scaleSubresource, metav1.UpdateOptions{})
+	}
 	return err
 }

@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	timeout                = time.Second * 20
-	interval               = time.Millisecond * 250
+	timeout                = 2 * time.Second
+	interval               = 250 * time.Millisecond
 	scalerName             = "test-scaler"
 	namespace              = "default"
 	deploymentName         = "test-deployment"
@@ -177,6 +177,34 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 				Expect(err).ToNot(HaveOccurred())
 				return *deployment.Spec.Replicas
 			}, timeout, interval).Should(Equal(int32(10)))
+		})
+
+		It("Should not scale if in dry run mode", func() {
+			By("Getting the existing scaler")
+			var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
+			Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
+
+			By("Setting the scaler to dry run mode")
+			horizontalreplicascaler.Spec.DryRun = true
+
+			By("Changing the static metric value to trigger a reconcile")
+			horizontalreplicascaler.Spec.Metrics[0].Target.Value = "9"
+			Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
+
+			By("Getting the status of the scaler to check if the status was updated")
+			Eventually(func() int32 {
+				var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
+				Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
+				return horizontalreplicascaler.Status.DesiredReplicas
+			}, timeout, interval).Should(Equal(int32(9)))
+
+			By("Getting the deployment to check the replica count")
+			Consistently(func() int32 {
+				var deployment appsv1.Deployment
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)
+				Expect(err).ToNot(HaveOccurred())
+				return *deployment.Spec.Replicas
+			}, timeout, interval).Should(Equal(int32(initialDeploymentScale)))
 		})
 
 		It("Should scale down according to the stabilization window", func() {
