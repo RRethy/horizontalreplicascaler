@@ -33,14 +33,16 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	cfg           *rest.Config
-	k8sClient     client.Client
-	scaleClient   scale.ScalesGetter
-	eventRecorder *record.FakeRecorder
-	testEnv       *envtest.Environment
-	ctx           context.Context
-	cancel        context.CancelFunc
-	fakeclock     *clock.FakeClock
+	cfg                          *rest.Config
+	k8sClient                    client.Client
+	scaleClient                  scale.ScalesGetter
+	eventRecorder                *record.FakeRecorder
+	testEnv                      *envtest.Environment
+	ctx                          context.Context
+	cancel                       context.CancelFunc
+	fakeclock                    *clock.FakeClock
+	scaleDownStabilizationWindow *stabilization.Window
+	scaleUpStabilizationWindow   *stabilization.Window
 )
 
 func TestControllers(t *testing.T) {
@@ -91,13 +93,16 @@ var _ = BeforeSuite(func() {
 
 	fakeclock = clock.NewFakeClock(time.Date(1997, time.November, 7, 0, 0, 0, 0, time.UTC))
 
+	scaleDownStabilizationWindow = stabilization.NewWindow(stabilization.MaxRollingWindow, stabilization.WithClock(fakeclock))
+	scaleUpStabilizationWindow = stabilization.NewWindow(stabilization.MinRollingWindow, stabilization.WithClock(fakeclock))
+
 	err = (&HorizontalReplicaScalerReconciler{
 		Client:                       k8sManager.GetClient(),
 		Scheme:                       k8sManager.GetScheme(),
 		Recorder:                     eventRecorder,
 		ScaleClient:                  scaleClient,
-		ScaleDownStabilizationWindow: stabilization.NewWindow(stabilization.MaxRollingWindow, stabilization.WithClock(fakeclock)),
-		ScaleUpStabilizationWindow:   stabilization.NewWindow(stabilization.MinRollingWindow, stabilization.WithClock(fakeclock)),
+		ScaleDownStabilizationWindow: scaleDownStabilizationWindow,
+		ScaleUpStabilizationWindow:   scaleUpStabilizationWindow,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

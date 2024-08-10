@@ -24,6 +24,7 @@ func TestWindow_Stabilize(t *testing.T) {
 		windowDuration     time.Duration
 		expectedEvents     map[string][]rrethyv1.ScaleEvent
 		expectedStabilized int32
+		expectedOk         bool
 	}{
 		{
 			testName:          "max rolling window has max event at head",
@@ -249,7 +250,8 @@ func TestWindow_Stabilize(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			w := NewWindow(test.rollingWindowType, WithClock(clock.NewFakeClock(test.currentTime)))
 			w.RollingEvents = test.initialEvents
-			stabilized := w.Stabilize(test.key, test.value, test.windowDuration)
+			stabilized, ok := w.Stabilize(test.key, test.value, test.windowDuration)
+			assert.Equal(t, test.expectedOk, ok)
 			assert.Equal(t, test.expectedStabilized, stabilized)
 			assert.Equal(t, test.expectedEvents, w.RollingEvents)
 		})

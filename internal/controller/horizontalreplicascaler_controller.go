@@ -170,8 +170,16 @@ func (r *HorizontalReplicaScalerReconciler) applyScalingBehavior(horizontalRepli
 		horizontalReplicaScaler.Spec.ScaleTargetRef.Kind,
 		horizontalReplicaScaler.Spec.ScaleTargetRef.Group,
 	)
-	stabilizedDownScale := r.ScaleDownStabilizationWindow.Stabilize(stabilizationWindowKey, desiredReplicas, horizontalReplicaScaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow.Duration)
-	stabilizedUpScale := r.ScaleUpStabilizationWindow.Stabilize(stabilizationWindowKey, desiredReplicas, horizontalReplicaScaler.Spec.ScalingBehavior.ScaleUp.StabilizationWindow.Duration)
+
+	stabilizedDownScale, ok := r.ScaleDownStabilizationWindow.Stabilize(stabilizationWindowKey, desiredReplicas, horizontalReplicaScaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow.Duration)
+	if !ok {
+		stabilizedDownScale = currentReplicas
+	}
+
+	stabilizedUpScale, ok := r.ScaleUpStabilizationWindow.Stabilize(stabilizationWindowKey, desiredReplicas, horizontalReplicaScaler.Spec.ScalingBehavior.ScaleUp.StabilizationWindow.Duration)
+	if !ok {
+		stabilizedUpScale = currentReplicas
+	}
 
 	if desiredReplicas < currentReplicas {
 		return slices.Min([]int32{stabilizedDownScale, currentReplicas})

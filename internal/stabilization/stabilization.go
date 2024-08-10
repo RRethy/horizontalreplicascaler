@@ -72,15 +72,16 @@ func NewWindow(rollingWindowType RollingWindowType, options ...Option) *Window {
 }
 
 // Stabilize is a thread-safe method which adds an event to the rolling window for the given key,
-// and returns the stabilized value over the window duration.
-// It takes amortized O(1) time to update the rolling window,
-// but O(n) time to write back to the status for bookkeeping.
-func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration) (stabilized int32) {
+// and returns the stabilized value over the window duration if the window is at least windowDuration, and true.
+// Otherwise it return 0 and false.
+// This function runs in amortized O(1) time.
+func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration) (stabilized int32, ok bool) {
 	w.Mutex.Lock()
 	defer w.Mutex.Unlock()
 
 	window := w.RollingEvents[key]
 	t := w.Clock.Now()
+	popped := false
 
 	// windowDuration being 0 is a bit of a special case.
 	// We would like this to mean the window only has the latest event.
@@ -89,6 +90,7 @@ func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration
 	// So we need to make sure we only keep the latest event.
 	for len(window) > 0 && (windowDuration == 0 || window[0].Timestamp.Add(windowDuration).Before(t)) {
 		window = window[1:]
+		popped = true
 	}
 
 	switch w.Type {
@@ -107,5 +109,8 @@ func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration
 	window = append(window, rrethyv1.ScaleEvent{Value: value, Timestamp: metav1.NewTime(t)})
 	w.RollingEvents[key] = window
 
-	return window[0].Value
+	if popped {
+		return window[0].Value, true
+	}
+	return 0, false
 }
