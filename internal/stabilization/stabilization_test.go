@@ -30,6 +30,7 @@ func TestWindow_Stabilize(t *testing.T) {
 			testName:          "max rolling window has max event at head",
 			rollingWindowType: MaxRollingWindow,
 			initialEvents: map[string][]rrethyv1.ScaleEvent{"foobar": {
+				{Value: 5, Timestamp: metav1.NewTime(initialTime.Add(-10000 * time.Second))}, // we need an event outside the window
 				{Value: 4, Timestamp: initialTime},
 				{Value: 3, Timestamp: initialTime},
 				{Value: 1, Timestamp: initialTime},
@@ -44,11 +45,13 @@ func TestWindow_Stabilize(t *testing.T) {
 				{Value: 2, Timestamp: metav1.NewTime(initialTime.Add(1 * time.Millisecond))},
 			}},
 			expectedStabilized: 4,
+			expectedOk:         true,
 		},
 		{
 			testName:          "min rolling window has min event at head",
 			rollingWindowType: MinRollingWindow,
 			initialEvents: map[string][]rrethyv1.ScaleEvent{"foobar": {
+				{Value: 0, Timestamp: metav1.NewTime(initialTime.Add(-1 * time.Second))}, // we need an event outside the window
 				{Value: 1, Timestamp: initialTime},
 				{Value: 3, Timestamp: initialTime},
 				{Value: 7, Timestamp: initialTime},
@@ -63,6 +66,7 @@ func TestWindow_Stabilize(t *testing.T) {
 				{Value: 5, Timestamp: metav1.NewTime(initialTime.Add(1 * time.Millisecond))},
 			}},
 			expectedStabilized: 1,
+			expectedOk:         true,
 		},
 		{
 			testName:          "values outside the window are removed",
@@ -82,11 +86,13 @@ func TestWindow_Stabilize(t *testing.T) {
 				{Value: 1, Timestamp: metav1.NewTime(initialTime.Add(11 * time.Second))},
 			}},
 			expectedStabilized: 4,
+			expectedOk:         true,
 		},
 		{
 			testName:          "values inside the window are kept",
 			rollingWindowType: MaxRollingWindow,
 			initialEvents: map[string][]rrethyv1.ScaleEvent{"foobar": {
+				{Value: 6, Timestamp: metav1.NewTime(initialTime.Add(-10 * time.Second))}, // we need an event outside the window
 				{Value: 6, Timestamp: initialTime},
 				{Value: 4, Timestamp: metav1.NewTime(initialTime.Add(5 * time.Second))},
 				{Value: 3, Timestamp: metav1.NewTime(initialTime.Add(10 * time.Second))},
@@ -102,6 +108,7 @@ func TestWindow_Stabilize(t *testing.T) {
 				{Value: 1, Timestamp: metav1.NewTime(initialTime.Add(11 * time.Second))},
 			}},
 			expectedStabilized: 6,
+			expectedOk:         true,
 		},
 		{
 			testName:          "max stabilization window of 0 seconds keep single value",
@@ -119,6 +126,7 @@ func TestWindow_Stabilize(t *testing.T) {
 				{Value: 1, Timestamp: metav1.NewTime(initialTime.Add(3 * time.Second))},
 			}},
 			expectedStabilized: 1,
+			expectedOk:         true,
 		},
 		{
 			testName:          "min stabilization window of 0 seconds keep single value",
@@ -136,11 +144,13 @@ func TestWindow_Stabilize(t *testing.T) {
 				{Value: 1, Timestamp: metav1.NewTime(initialTime.Add(3 * time.Second))},
 			}},
 			expectedStabilized: 1,
+			expectedOk:         true,
 		},
 		{
 			testName:          "value greater than all others results in single value",
 			rollingWindowType: MaxRollingWindow,
 			initialEvents: map[string][]rrethyv1.ScaleEvent{"foobar": {
+				{Value: 6, Timestamp: metav1.NewTime(initialTime.Add(-20 * time.Second))}, // we need an event outside the window
 				{Value: 6, Timestamp: initialTime},
 				{Value: 4, Timestamp: metav1.NewTime(initialTime.Add(1 * time.Second))},
 				{Value: 3, Timestamp: metav1.NewTime(initialTime.Add(2 * time.Second))},
@@ -153,11 +163,13 @@ func TestWindow_Stabilize(t *testing.T) {
 				{Value: 10, Timestamp: metav1.NewTime(initialTime.Add(3 * time.Second))},
 			}},
 			expectedStabilized: 10,
+			expectedOk:         true,
 		},
 		{
 			testName:          "max rolling keeps duplicate values",
 			rollingWindowType: MaxRollingWindow,
 			initialEvents: map[string][]rrethyv1.ScaleEvent{"foobar": {
+				{Value: 6, Timestamp: metav1.NewTime(initialTime.Add(-20 * time.Second))}, // we need an event outside the window
 				{Value: 6, Timestamp: initialTime},
 				{Value: 4, Timestamp: metav1.NewTime(initialTime.Add(1 * time.Second))},
 				{Value: 3, Timestamp: metav1.NewTime(initialTime.Add(2 * time.Second))},
@@ -172,11 +184,13 @@ func TestWindow_Stabilize(t *testing.T) {
 				{Value: 4, Timestamp: metav1.NewTime(initialTime.Add(3 * time.Second))},
 			}},
 			expectedStabilized: 6,
+			expectedOk:         true,
 		},
 		{
 			testName:          "min rolling keeps duplicate values",
 			rollingWindowType: MinRollingWindow,
 			initialEvents: map[string][]rrethyv1.ScaleEvent{"foobar": {
+				{Value: 2, Timestamp: metav1.NewTime(initialTime.Add(-20 * time.Second))}, // we need an event outside the window
 				{Value: 2, Timestamp: initialTime},
 				{Value: 4, Timestamp: metav1.NewTime(initialTime.Add(1 * time.Second))},
 				{Value: 5, Timestamp: metav1.NewTime(initialTime.Add(2 * time.Second))},
@@ -191,6 +205,7 @@ func TestWindow_Stabilize(t *testing.T) {
 				{Value: 4, Timestamp: metav1.NewTime(initialTime.Add(3 * time.Second))},
 			}},
 			expectedStabilized: 2,
+			expectedOk:         true,
 		},
 		{
 			testName:          "multiple keys are handled independently",
@@ -202,6 +217,7 @@ func TestWindow_Stabilize(t *testing.T) {
 					{Value: 5, Timestamp: metav1.NewTime(initialTime.Add(2 * time.Second))},
 				},
 				"barfoo": {
+					{Value: 2, Timestamp: metav1.NewTime(initialTime.Add(-20 * time.Second))}, // we need an event outside the window
 					{Value: 2, Timestamp: initialTime},
 					{Value: 4, Timestamp: metav1.NewTime(initialTime.Add(1 * time.Second))},
 					{Value: 5, Timestamp: metav1.NewTime(initialTime.Add(2 * time.Second))},
@@ -224,6 +240,7 @@ func TestWindow_Stabilize(t *testing.T) {
 				},
 			},
 			expectedStabilized: 2,
+			expectedOk:         true,
 		},
 		{
 			testName:          "window is inclusive",
@@ -243,6 +260,7 @@ func TestWindow_Stabilize(t *testing.T) {
 				{Value: 2, Timestamp: metav1.NewTime(initialTime.Add(3 * time.Second))},
 			}},
 			expectedStabilized: 4,
+			expectedOk:         true,
 		},
 	}
 

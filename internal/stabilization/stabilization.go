@@ -44,12 +44,13 @@ type Window struct {
 	// Clock is used to get the current time.
 	// It is mocked in tests.
 	Clock clock.Clock
-	// Mutex is used to synchronize access to the RollingEvents map.
+	// Mutex is used to synchronize access to the stabilization window, RollingEvents.
 	Mutex sync.RWMutex
 	// Type is the type of rolling window.
 	// It can be either MaxRollingWindow or MinRollingWindow.
 	Type RollingWindowType
-	// RollingEvents is a map of keys to a list of events.
+	// RollingEvents is the stabilization window.
+	// It is a map of keys to a list of events.
 	// Only events that are within the window duration,
 	// and can be the min/max are kept.
 	RollingEvents map[string][]rrethyv1.ScaleEvent
@@ -72,8 +73,8 @@ func NewWindow(rollingWindowType RollingWindowType, options ...Option) *Window {
 }
 
 // Stabilize is a thread-safe method which adds an event to the rolling window for the given key,
-// and returns the stabilized value over the window duration if the window is at least windowDuration, and true.
-// Otherwise it return 0 and false.
+// and returns the stabilized value over the window duration if the window is at least windowDuration.
+// If the window is not at least windowDuration, it returns 0 and false.
 // This function runs in amortized O(1) time.
 func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration) (stabilized int32, ok bool) {
 	w.Mutex.Lock()
@@ -83,11 +84,8 @@ func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration
 	t := w.Clock.Now()
 	popped := false
 
-	// windowDuration being 0 is a bit of a special case.
-	// We would like this to mean the window only has the latest event.
-	// That's usually the behavior we would see, but in tests when using a fake clock,
-	// the time might not advance between events.
-	// So we need to make sure we only keep the latest event.
+	// windowDuration being 0 is a bit of a special case. We would like to only keep the latest event.
+	// This is similar to how the stabilization window works in the Kubernetes HPA.
 	for len(window) > 0 && (windowDuration == 0 || window[0].Timestamp.Add(windowDuration).Before(t)) {
 		window = window[1:]
 		popped = true

@@ -26,6 +26,8 @@ type ScalingRules struct {
 	// StabilizationWindowSeconds is the number of seconds to wait before considering the system stable.
 	// A stabilization window of 0 seconds means the replica suggestion will be applied immediately.
 	// This may cause thrashing. A stabilization that is too long may cause the system to be unresponsive.
+	// For scaling up, this should be 0s unless the system is known to be extremely unstable.
+	// Stabilization windows are cleared when the controller restarts to error on the side of caution.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Default=0s
 	StabilizationWindow metav1.Duration `json:"stabilizationWindowSeconds,omitempty"`
