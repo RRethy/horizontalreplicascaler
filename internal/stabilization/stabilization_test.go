@@ -262,6 +262,18 @@ func TestWindow_Stabilize(t *testing.T) {
 			expectedStabilized: 4,
 			expectedOk:         true,
 		},
+		{
+			testName:           "empty window with 0 duration returns event and true",
+			rollingWindowType:  MaxRollingWindow,
+			initialEvents:      map[string][]rrethyv1.ScaleEvent{},
+			currentTime:        initialTime.Time,
+			key:                "foobar",
+			value:              1,
+			windowDuration:     0,
+			expectedEvents:     map[string][]rrethyv1.ScaleEvent{"foobar": {{Value: 1, Timestamp: initialTime}}},
+			expectedStabilized: 1,
+			expectedOk:         true,
+		},
 	}
 
 	for _, test := range tests {

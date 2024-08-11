@@ -17,14 +17,14 @@ import (
 )
 
 const (
-	timeout                = 2 * time.Second
+	timeout                = 500 * time.Millisecond
 	interval               = 250 * time.Millisecond
 	scalerName             = "test-scaler"
 	namespace              = "default"
 	deploymentName         = "test-deployment"
 	initialDeploymentScale = 10
-	initialMaxReplicas     = 20
 	initialMinReplicas     = 3
+	initialMaxReplicas     = 20
 )
 
 var (
@@ -69,10 +69,9 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 			By("Waiting for the deployment to scale based on the default scaler")
 			Eventually(func() int32 {
 				var deployment appsv1.Deployment
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)
-				Expect(err).ToNot(HaveOccurred())
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)).To(Succeed())
 				return *deployment.Spec.Replicas
-			}, timeout, interval).Should(Equal(int32(10)))
+			}, timeout, interval).Should(Equal(int32(initialDeploymentScale)))
 		})
 
 		AfterEach(func() {
@@ -211,7 +210,7 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 			// By("Getting the existing scaler")
 			// var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
 			// Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
-			//
+
 			// By("Changing the scale down stabilization window to 1 second")
 			// horizontalreplicascaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow = metav1.Duration{Duration: 1 * time.Second}
 			// horizontalreplicascaler.Spec.Metrics[0].Target.Value = "2"

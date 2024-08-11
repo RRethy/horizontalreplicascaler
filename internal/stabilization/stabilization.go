@@ -82,10 +82,10 @@ func (w *Window) Stabilize(key string, value int32, windowDuration time.Duration
 
 	window := w.RollingEvents[key]
 	t := w.Clock.Now()
-	popped := false
 
 	// windowDuration being 0 is a bit of a special case. We would like to only keep the latest event.
 	// This is similar to how the stabilization window works in the Kubernetes HPA.
+	popped := windowDuration == 0
 	for len(window) > 0 && (windowDuration == 0 || window[0].Timestamp.Add(windowDuration).Before(t)) {
 		window = window[1:]
 		popped = true

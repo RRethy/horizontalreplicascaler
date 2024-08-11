@@ -59,8 +59,6 @@ type HorizontalReplicaScalerReconciler struct {
 func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	pollingInterval := horizontalReplicaScaler.Spec.PollingInterval.Duration
-
 	if !horizontalReplicaScaler.DeletionTimestamp.IsZero() {
 		// The object is being deleted, don't do anything.
 		return ctrl.Result{}, nil
@@ -72,6 +70,8 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 			log.Error(err, "updating status")
 		}
 	}()
+
+	pollingInterval := horizontalReplicaScaler.Spec.PollingInterval.Duration
 
 	scaleSubresource, err := r.getScaleSubresource(ctx, horizontalReplicaScaler)
 	if err != nil {
