@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -14,10 +15,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
+	"github.com/RRethy/horizontalreplicascaler/internal/stabilization"
 )
 
 const (
-	timeout                = 500 * time.Millisecond
+	consistentlyTimeout    = 1 * time.Second
+	eventuallyTimeout      = 2 * time.Second
 	interval               = 250 * time.Millisecond
 	scalerName             = "test-scaler"
 	namespace              = "default"
@@ -28,11 +31,11 @@ const (
 )
 
 var (
-	defaultScalerNamespacedName = types.NamespacedName{
-		Name:      scalerName,
-		Namespace: namespace,
-	}
-	defaultDeployment = &appsv1.Deployment{
+	defaultScaleTargetRef           = rrethyv1.ScaleTargetRef{Group: "apps", Kind: "Deployment", Name: deploymentName}
+	defaultDeploymentNamespacedName = types.NamespacedName{Name: deploymentName, Namespace: namespace}
+	defaultStabilizationKey         = stabilization.KeyFor(namespace, scalerName, deploymentName, defaultScaleTargetRef.Kind, defaultScaleTargetRef.Group)
+	defaultScalerNamespacedName     = types.NamespacedName{Name: scalerName, Namespace: namespace}
+	defaultDeployment               = &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: deploymentName, Namespace: namespace},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
@@ -69,9 +72,9 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 			By("Waiting for the deployment to scale based on the default scaler")
 			Eventually(func() int32 {
 				var deployment appsv1.Deployment
-				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)).To(Succeed())
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
 				return *deployment.Spec.Replicas
-			}, timeout, interval).Should(Equal(int32(initialDeploymentScale)))
+			}, eventuallyTimeout, interval).Should(Equal(int32(initialDeploymentScale)))
 		})
 
 		AfterEach(func() {
@@ -80,7 +83,7 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 
 			By("Getting the existing deployment")
 			var deployment appsv1.Deployment
-			err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)
+			err := k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)
 			Expect(err).To(SatisfyAny(BeNil(), WithTransform(errors.IsNotFound, BeTrue())))
 
 			if err == nil {
@@ -101,10 +104,9 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 			By("Getting the deployment to check the replica count")
 			Eventually(func() int32 {
 				var deployment appsv1.Deployment
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)
-				Expect(err).ToNot(HaveOccurred())
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
 				return *deployment.Spec.Replicas
-			}, timeout, interval).Should(Equal(int32(5)))
+			}, eventuallyTimeout, interval).Should(Equal(int32(5)))
 		})
 
 		It("Should create an event if the scale subresource does not exist", func() {
@@ -134,10 +136,9 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 			By("Getting the deployment to check the replica count")
 			Eventually(func() int32 {
 				var deployment appsv1.Deployment
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)
-				Expect(err).ToNot(HaveOccurred())
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
 				return *deployment.Spec.Replicas
-			}, timeout, interval).Should(Equal(int32(9)))
+			}, eventuallyTimeout, interval).Should(Equal(int32(9)))
 		})
 
 		It("Should respect min replicas", func() {
@@ -153,10 +154,9 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 			By("Getting the deployment to check the replica count")
 			Eventually(func() int32 {
 				var deployment appsv1.Deployment
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)
-				Expect(err).ToNot(HaveOccurred())
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
 				return *deployment.Spec.Replicas
-			}, timeout, interval).Should(Equal(int32(5)))
+			}, eventuallyTimeout, interval).Should(Equal(int32(5)))
 		})
 
 		It("Should respect max replicas", func() {
@@ -172,10 +172,9 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 			By("Getting the deployment to check the replica count")
 			Eventually(func() int32 {
 				var deployment appsv1.Deployment
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)
-				Expect(err).ToNot(HaveOccurred())
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
 				return *deployment.Spec.Replicas
-			}, timeout, interval).Should(Equal(int32(10)))
+			}, eventuallyTimeout, interval).Should(Equal(int32(10)))
 		})
 
 		It("Should not scale if in dry run mode", func() {
@@ -195,44 +194,191 @@ var _ = Describe("HorizontalReplicaScaler Controller", func() {
 				var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
 				Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
 				return horizontalreplicascaler.Status.DesiredReplicas
-			}, timeout, interval).Should(Equal(int32(9)))
+			}, eventuallyTimeout, interval).Should(Equal(int32(9)))
 
 			By("Getting the deployment to check the replica count")
 			Consistently(func() int32 {
 				var deployment appsv1.Deployment
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: namespace}, &deployment)
-				Expect(err).ToNot(HaveOccurred())
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
 				return *deployment.Spec.Replicas
-			}, timeout, interval).Should(Equal(int32(initialDeploymentScale)))
+			}, consistentlyTimeout, interval).Should(Equal(int32(initialDeploymentScale)))
 		})
 
 		It("Should scale down according to the stabilization window", func() {
-			// By("Getting the existing scaler")
-			// var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
-			// Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
+			stabilizationWindowDuration := 1 * time.Second
 
-			// By("Changing the scale down stabilization window to 1 second")
-			// horizontalreplicascaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow = metav1.Duration{Duration: 1 * time.Second}
-			// horizontalreplicascaler.Spec.Metrics[0].Target.Value = "2"
-			// Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
-		})
+			By("Setting up a fake stabilization window")
+			scaleDownStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale-2, stabilizationWindowDuration+10*time.Second)
+			fakeclock.SetTime(fakeclock.Now().Add(600 * time.Millisecond))
+			scaleDownStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale-1, stabilizationWindowDuration+10*time.Second)
+			scaleDownStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale-5, stabilizationWindowDuration+10*time.Second)
+			fakeclock.SetTime(fakeclock.Now().Add(500 * time.Millisecond))
 
-		It("Should scale up freely when only a scale down stabilization window is set", func() {
-		})
+			By("Getting the existing scaler")
+			var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
+			Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
 
-		It("Should not scale down if any event in the stabilization window is a scale up event", func() {
+			By("Changing the scale down stabilization window to 1 second and metric value to less than current")
+			horizontalreplicascaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow = metav1.Duration{Duration: stabilizationWindowDuration}
+			horizontalreplicascaler.Spec.Metrics[0].Target.Value = strconv.Itoa(initialDeploymentScale - 4)
+			Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
+
+			By("Getting the deployment to check the replica count")
+			Eventually(func() int32 {
+				var deployment appsv1.Deployment
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
+				return *deployment.Spec.Replicas
+			}, eventuallyTimeout, interval).Should(Equal(int32(initialDeploymentScale - 1)))
 		})
 
 		It("Should scale up according to the stabilization window", func() {
+			stabilizationWindowDuration := 1 * time.Second
+
+			By("Setting up a fake stabilization window")
+			scaleUpStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale+2, stabilizationWindowDuration+10*time.Second)
+			fakeclock.SetTime(fakeclock.Now().Add(600 * time.Millisecond))
+			scaleUpStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale+1, stabilizationWindowDuration+10*time.Second)
+			scaleUpStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale+5, stabilizationWindowDuration+10*time.Second)
+			fakeclock.SetTime(fakeclock.Now().Add(500 * time.Millisecond))
+
+			By("Getting the existing scaler")
+			var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
+			Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
+
+			By("Changing the scale up stabilization window to 1 second and metric value to greater than current")
+			horizontalreplicascaler.Spec.ScalingBehavior.ScaleUp.StabilizationWindow = metav1.Duration{Duration: stabilizationWindowDuration}
+			horizontalreplicascaler.Spec.Metrics[0].Target.Value = strconv.Itoa(initialDeploymentScale + 4)
+			Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
+
+			By("Getting the deployment to check the replica count")
+			Eventually(func() int32 {
+				var deployment appsv1.Deployment
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
+				return *deployment.Spec.Replicas
+			}, eventuallyTimeout, interval).Should(Equal(int32(initialDeploymentScale + 1)))
 		})
 
-		It("Should scale down freely when only a scale up stabilization window is set", func() {
+		It("Should not scale down if stabilization window is not met", func() {
+			stabilizationWindowDuration := 1 * time.Second
+
+			By("Setting up a fake stabilization window")
+			scaleDownStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale-2, stabilizationWindowDuration+10*time.Second)
+			scaleDownStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale-1, stabilizationWindowDuration+10*time.Second)
+			scaleDownStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale-5, stabilizationWindowDuration+10*time.Second)
+			fakeclock.SetTime(fakeclock.Now().Add(500 * time.Millisecond))
+
+			By("Getting the existing scaler")
+			var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
+			Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
+
+			By("Changing the scale down stabilization window to 1 second and metric value to less than current")
+			horizontalreplicascaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow = metav1.Duration{Duration: stabilizationWindowDuration}
+			horizontalreplicascaler.Spec.Metrics[0].Target.Value = strconv.Itoa(initialDeploymentScale - 4)
+			Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
+
+			By("Getting the deployment to check the replica count")
+			Consistently(func() int32 {
+				var deployment appsv1.Deployment
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
+				return *deployment.Spec.Replicas
+			}, consistentlyTimeout, interval).Should(Equal(int32(initialDeploymentScale)))
 		})
 
-		It("Should not scale up if any event in the stabilization window is a scale down event", func() {
+		It("Should not scale up if stabilization window is not met", func() {
+			stabilizationWindowDuration := 1 * time.Second
+
+			By("Setting up a fake stabilization window")
+			scaleUpStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale+2, stabilizationWindowDuration+10*time.Second)
+			scaleUpStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale+1, stabilizationWindowDuration+10*time.Second)
+			scaleUpStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale+5, stabilizationWindowDuration+10*time.Second)
+			fakeclock.SetTime(fakeclock.Now().Add(500 * time.Millisecond))
+
+			By("Getting the existing scaler")
+			var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
+			Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
+
+			By("Changing the scale up stabilization window to 1 second and metric value to greater than current")
+			horizontalreplicascaler.Spec.ScalingBehavior.ScaleUp.StabilizationWindow = metav1.Duration{Duration: stabilizationWindowDuration}
+			horizontalreplicascaler.Spec.Metrics[0].Target.Value = strconv.Itoa(initialDeploymentScale + 4)
+			Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
+
+			By("Getting the deployment to check the replica count")
+			Consistently(func() int32 {
+				var deployment appsv1.Deployment
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
+				return *deployment.Spec.Replicas
+			}, consistentlyTimeout, interval).Should(Equal(int32(initialDeploymentScale)))
 		})
 
-		It("Should not scale if the desired replicas is thrashing and we have scale up and down stabilization", func() {
+		It("Should not scale if metric is oscillating and we have up and down stabilization", func() {
+			stabilizationWindowDuration := 1 * time.Second
+
+			By("Setting up a fake stabilization window")
+			for _, value := range []int32{initialDeploymentScale - 2, initialDeploymentScale + 2} {
+				scaleDownStabilizationWindow.Stabilize(defaultStabilizationKey, value, stabilizationWindowDuration+10*time.Second)
+				scaleUpStabilizationWindow.Stabilize(defaultStabilizationKey, value, stabilizationWindowDuration+10*time.Second)
+			}
+			fakeclock.SetTime(fakeclock.Now().Add(600 * time.Millisecond))
+			for _, value := range []int32{initialDeploymentScale - 1, initialDeploymentScale + 1, initialDeploymentScale - 5, initialDeploymentScale + 5} {
+				scaleDownStabilizationWindow.Stabilize(defaultStabilizationKey, value, stabilizationWindowDuration+10*time.Second)
+				scaleUpStabilizationWindow.Stabilize(defaultStabilizationKey, value, stabilizationWindowDuration+10*time.Second)
+			}
+			fakeclock.SetTime(fakeclock.Now().Add(500 * time.Millisecond))
+
+			By("Getting the existing scaler")
+			var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
+			Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
+
+			By("Changing the scale down stabilization window to 1 second and metric value to greater than current")
+			horizontalreplicascaler.Spec.ScalingBehavior.ScaleDown.StabilizationWindow = metav1.Duration{Duration: stabilizationWindowDuration}
+			horizontalreplicascaler.Spec.ScalingBehavior.ScaleUp.StabilizationWindow = metav1.Duration{Duration: stabilizationWindowDuration}
+			horizontalreplicascaler.Spec.Metrics[0].Target.Value = strconv.Itoa(initialDeploymentScale + 4)
+			Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
+
+			By("Getting the deployment to check the replica count")
+			Consistently(func() int32 {
+				var deployment appsv1.Deployment
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
+				return *deployment.Spec.Replicas
+			}, consistentlyTimeout, interval).Should(Equal(int32(initialDeploymentScale)))
+
+			By("Changing the metric value to less than current")
+			horizontalreplicascaler.Spec.Metrics[0].Target.Value = strconv.Itoa(initialDeploymentScale - 4)
+			Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
+
+			By("Getting the deployment to check the replica count")
+			Consistently(func() int32 {
+				var deployment appsv1.Deployment
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
+				return *deployment.Spec.Replicas
+			}, consistentlyTimeout, interval).Should(Equal(int32(initialDeploymentScale)))
+		})
+
+		It("Should not scale if desired replicas are equal to target", func() {
+			stabilizationWindowDuration := 1 * time.Second
+
+			By("Setting up a fake stabilization window")
+			scaleUpStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale+2, stabilizationWindowDuration+10*time.Second)
+			fakeclock.SetTime(fakeclock.Now().Add(600 * time.Millisecond))
+			scaleUpStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale+1, stabilizationWindowDuration+10*time.Second)
+			scaleUpStabilizationWindow.Stabilize(defaultStabilizationKey, initialDeploymentScale+5, stabilizationWindowDuration+10*time.Second)
+			fakeclock.SetTime(fakeclock.Now().Add(500 * time.Millisecond))
+
+			By("Getting the existing scaler")
+			var horizontalreplicascaler rrethyv1.HorizontalReplicaScaler
+			Expect(k8sClient.Get(ctx, defaultScalerNamespacedName, &horizontalreplicascaler)).To(Succeed())
+
+			By("Changing the scale up stabilization window to 1 second and metric value to equal to current")
+			horizontalreplicascaler.Spec.ScalingBehavior.ScaleUp.StabilizationWindow = metav1.Duration{Duration: stabilizationWindowDuration}
+			horizontalreplicascaler.Spec.Metrics[0].Target.Value = strconv.Itoa(initialDeploymentScale)
+			Expect(k8sClient.Update(ctx, &horizontalreplicascaler)).To(Succeed())
+
+			By("Getting the deployment to check the replica count")
+			Consistently(func() int32 {
+				var deployment appsv1.Deployment
+				Expect(k8sClient.Get(ctx, defaultDeploymentNamespacedName, &deployment)).To(Succeed())
+				return *deployment.Spec.Replicas
+			}, consistentlyTimeout, interval).Should(Equal(int32(initialDeploymentScale)))
 		})
 	})
 })

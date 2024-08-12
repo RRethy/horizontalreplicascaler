@@ -87,8 +87,8 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 	}
 
 	desiredReplicas := r.getMaxMetricValues(metricResults)
-	desiredReplicas = r.applyMinMaxReplicas(horizontalReplicaScaler, desiredReplicas)
 	desiredReplicas = r.applyScalingBehavior(horizontalReplicaScaler, scaleSubresource.Spec.Replicas, desiredReplicas)
+	desiredReplicas = r.applyMinMaxReplicas(horizontalReplicaScaler, desiredReplicas)
 
 	err = r.updateScaleSubresource(ctx, horizontalReplicaScaler, scaleSubresource, desiredReplicas)
 	if err != nil {
