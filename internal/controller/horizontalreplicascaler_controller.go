@@ -25,6 +25,7 @@ import (
 )
 
 const (
+	// EventReasonFailedGetScaleSubresource is the reason for the event when the scale subresource cannot be retrieved.
 	EventReasonFailedGetScaleSubresource = "FailedGetScaleSubresource"
 )
 
