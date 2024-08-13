@@ -81,15 +81,15 @@ func (r *HorizontalReplicaScalerReconciler) Reconcile(ctx context.Context, horiz
 		return ctrl.Result{RequeueAfter: pollingInterval}, client.IgnoreNotFound(err)
 	}
 
-	metricResults, err := r.getMetricValues(horizontalReplicaScaler)
+	metricResults, err := r.getMetricValues(ctx, horizontalReplicaScaler)
 	if err != nil {
 		log.Error(err, "getting metric results")
 		return ctrl.Result{RequeueAfter: pollingInterval}, err
 	}
 
-	desiredReplicas := r.getMaxMetricValues(metricResults)
-	desiredReplicas = r.applyScalingBehavior(horizontalReplicaScaler, scaleSubresource.Spec.Replicas, desiredReplicas)
-	desiredReplicas = r.applyMinMaxReplicas(horizontalReplicaScaler, desiredReplicas)
+	desiredReplicas := r.getMaxMetricValues(ctx, metricResults)
+	desiredReplicas = r.applyScalingBehavior(ctx, horizontalReplicaScaler, scaleSubresource.Spec.Replicas, desiredReplicas)
+	desiredReplicas = r.applyMinMaxReplicas(ctx, horizontalReplicaScaler, desiredReplicas)
 
 	err = r.updateScaleSubresource(ctx, horizontalReplicaScaler, scaleSubresource, desiredReplicas)
 	if err != nil {
@@ -115,10 +115,10 @@ func (r *HorizontalReplicaScalerReconciler) getScaleSubresource(ctx context.Cont
 }
 
 // getMetricResults returns the result of calculating each metric.
-func (r *HorizontalReplicaScalerReconciler) getMetricValues(horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) ([]metricValue, error) {
+func (r *HorizontalReplicaScalerReconciler) getMetricValues(ctx context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) ([]metricValue, error) {
 	var values []metricValue
 	for _, metric := range horizontalReplicaScaler.Spec.Metrics {
-		value, err := r.getMetricValue(metric)
+		value, err := r.getMetricValue(ctx, metric)
 		if err != nil {
 			return nil, err
 		}
@@ -128,7 +128,7 @@ func (r *HorizontalReplicaScalerReconciler) getMetricValues(horizontalReplicaSca
 }
 
 // getMetricResult returns the result of calculating a metric.
-func (r *HorizontalReplicaScalerReconciler) getMetricValue(metric rrethyv1.MetricSpec) (metricValue, error) {
+func (r *HorizontalReplicaScalerReconciler) getMetricValue(_ context.Context, metric rrethyv1.MetricSpec) (metricValue, error) {
 	switch metric.Type {
 	case "static":
 		target, err := strconv.ParseFloat(metric.Target.Value, 64)
@@ -141,7 +141,7 @@ func (r *HorizontalReplicaScalerReconciler) getMetricValue(metric rrethyv1.Metri
 	}
 }
 
-func (r *HorizontalReplicaScalerReconciler) getMaxMetricValues(metricValues []metricValue) int32 {
+func (r *HorizontalReplicaScalerReconciler) getMaxMetricValues(_ context.Context, metricValues []metricValue) int32 {
 	var maxResult float64
 	for _, metricResult := range metricValues {
 		if metricResult.value > maxResult {
@@ -151,7 +151,7 @@ func (r *HorizontalReplicaScalerReconciler) getMaxMetricValues(metricValues []me
 	return int32(maxResult)
 }
 
-func (r *HorizontalReplicaScalerReconciler) applyMinMaxReplicas(horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler, desiredReplicas int32) int32 {
+func (r *HorizontalReplicaScalerReconciler) applyMinMaxReplicas(_ context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler, desiredReplicas int32) int32 {
 	if desiredReplicas < horizontalReplicaScaler.Spec.MinReplicas {
 		return horizontalReplicaScaler.Spec.MinReplicas
 	}
@@ -161,7 +161,7 @@ func (r *HorizontalReplicaScalerReconciler) applyMinMaxReplicas(horizontalReplic
 	return desiredReplicas
 }
 
-func (r *HorizontalReplicaScalerReconciler) applyScalingBehavior(horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler, currentReplicas, desiredReplicas int32) int32 {
+func (r *HorizontalReplicaScalerReconciler) applyScalingBehavior(_ context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler, currentReplicas, desiredReplicas int32) int32 {
 	stabilizationWindowKey := stabilization.KeyFor(
 		horizontalReplicaScaler.Namespace,
 		horizontalReplicaScaler.Name,
