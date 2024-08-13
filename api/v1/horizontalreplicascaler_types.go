@@ -6,6 +6,14 @@ import (
 
 // Important: Run "make" to regenerate code after modifying this file.
 
+// MetricType is the type of metric to use.
+type MetricType string
+
+const (
+	StaticMetricType     MetricType = "static"
+	PrometheusMetricType MetricType = "prometheus"
+)
+
 type ScaleTargetRef struct {
 	// Group is the group of the target resource.
 	// +kubebuilder:validation:Required
@@ -73,7 +81,7 @@ type MetricSpec struct {
 	// Type is the type of metric to use.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum=static;prometheus
-	Type string `json:"type"`
+	Type MetricType `json:"type"`
 
 	// Config is a map of configuration values for the metric.
 	// +kubebuilder:validation:Optional

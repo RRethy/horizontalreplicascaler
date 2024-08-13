@@ -10,8 +10,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	promapi "github.com/prometheus/client_golang/api"
-	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -25,6 +23,7 @@ import (
 
 	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
 	"github.com/RRethy/horizontalreplicascaler/internal/controller"
+	"github.com/RRethy/horizontalreplicascaler/internal/metric"
 	"github.com/RRethy/horizontalreplicascaler/internal/stabilization"
 	// +kubebuilder:scaffold:imports
 )
@@ -116,21 +115,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	promClient, err := promapi.NewClient(promapi.Config{
-		Address: "http://observe-prometheus-proxy.autoscaler-operator.svc.cluster.local:9090",
-	})
-	if err != nil {
-		setupLog.Error(err, "unable to create prometheus client")
-		os.Exit(1)
-	}
-	promv1api := promv1.NewAPI(promClient)
-
 	if err = (&controller.HorizontalReplicaScalerReconciler{
 		Client:                       mgr.GetClient(),
 		Scheme:                       mgr.GetScheme(),
 		Recorder:                     mgr.GetEventRecorderFor("horizontalreplicascaler-controller"),
 		ScaleClient:                  scaleClient,
-		PromAPI:                      promv1api,
+		MetricClient:                 metric.NewClient(),
 		ScaleDownStabilizationWindow: stabilization.NewWindow(stabilization.MaxRollingWindow),
 		ScaleUpStabilizationWindow:   stabilization.NewWindow(stabilization.MinRollingWindow),
 	}).SetupWithManager(mgr); err != nil {

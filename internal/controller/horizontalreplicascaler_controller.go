@@ -2,11 +2,8 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"slices"
-	"strconv"
 
-	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
+	"github.com/RRethy/horizontalreplicascaler/internal/metric"
 	"github.com/RRethy/horizontalreplicascaler/internal/stabilization"
 )
 
@@ -40,7 +38,7 @@ type HorizontalReplicaScalerReconciler struct {
 	Scheme                       *runtime.Scheme
 	Recorder                     record.EventRecorder
 	ScaleClient                  scale.ScalesGetter
-	PromAPI                      promv1.API
+	MetricClient                 metric.Interface
 	ScaleDownStabilizationWindow *stabilization.Window
 	ScaleUpStabilizationWindow   *stabilization.Window
 }
@@ -115,30 +113,16 @@ func (r *HorizontalReplicaScalerReconciler) getScaleSubresource(ctx context.Cont
 }
 
 // getMetricResults returns the result of calculating each metric.
-func (r *HorizontalReplicaScalerReconciler) getMetricValues(ctx context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) ([]metricValue, error) {
+func (r *HorizontalReplicaScalerReconciler) getMetricValues(_ context.Context, horizontalReplicaScaler *rrethyv1.HorizontalReplicaScaler) ([]metricValue, error) {
 	var values []metricValue
 	for _, metric := range horizontalReplicaScaler.Spec.Metrics {
-		value, err := r.getMetricValue(ctx, metric)
+		rawValue, err := r.MetricClient.GetValue(metric)
 		if err != nil {
 			return nil, err
 		}
-		values = append(values, value)
+		values = append(values, metricValue{metric: metric, value: rawValue})
 	}
 	return values, nil
-}
-
-// getMetricResult returns the result of calculating a metric.
-func (r *HorizontalReplicaScalerReconciler) getMetricValue(_ context.Context, metric rrethyv1.MetricSpec) (metricValue, error) {
-	switch metric.Type {
-	case "static":
-		target, err := strconv.ParseFloat(metric.Target.Value, 64)
-		if err != nil {
-			return metricValue{}, fmt.Errorf("failed parsing target value %s: %w", metric.Target, err)
-		}
-		return metricValue{metric: metric, value: target}, nil
-	default:
-		return metricValue{}, fmt.Errorf("unknown metric type %s", metric.Type)
-	}
 }
 
 func (r *HorizontalReplicaScalerReconciler) getMaxMetricValues(_ context.Context, metricValues []metricValue) int32 {

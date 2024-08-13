@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	rrethyv1 "github.com/RRethy/horizontalreplicascaler/api/v1"
+	"github.com/RRethy/horizontalreplicascaler/internal/metric"
 	"github.com/RRethy/horizontalreplicascaler/internal/stabilization"
 	// +kubebuilder:scaffold:imports
 )
@@ -101,6 +102,7 @@ var _ = BeforeSuite(func() {
 		Scheme:                       k8sManager.GetScheme(),
 		Recorder:                     eventRecorder,
 		ScaleClient:                  scaleClient,
+		MetricClient:                 metric.NewClient(),
 		ScaleDownStabilizationWindow: scaleDownStabilizationWindow,
 		ScaleUpStabilizationWindow:   scaleUpStabilizationWindow,
 	}).SetupWithManager(k8sManager)
