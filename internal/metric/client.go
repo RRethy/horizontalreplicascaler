@@ -8,7 +8,11 @@ import (
 	"github.com/RRethy/horizontalreplicascaler/internal/metric/static"
 )
 
-var _ Interface = &Client{}
+var (
+	_ Interface = &Client{}
+	_ Interface = &static.Client{}
+	_ Interface = &prometheus.Client{}
+)
 
 type Interface interface {
 	GetValue(rrethyv1.MetricSpec) (float64, error)
